@@ -1,0 +1,328 @@
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id Int @default(autoincrement()) @id
+  name String @unique
+  rating Decimal @default(0) @db.Decimal(2, 1)
+  photo String @default("")
+  phone String @unique
+  roleId Int @default(1)
+  avatarMediaId Int? @unique
+  avatarMedia Media? @relation("userAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates Estate[]
+  sender Complaints[]
+  translations UserTranslation[]
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@map("users")
+}
+
+model Estate {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  description String @db.Text
+  area Int
+  price BigInt
+  userId Int
+  dealTermId Int
+  estateTypeId Int
+  roomId Int?
+  districtId Int
+  currencyTypeId Int
+  primaryMediaId Int? @unique
+  primaryImageUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+
+  complaints Complaints[]
+  room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  estateType EstateType @relation(fields: [estateTypeId], references: [id], onDelete: Cascade)
+  currencyType CurrencyType @relation(fields: [currencyTypeId], references: [id], onDelete: Cascade)
+  dealTerm DealTerm @relation(fields: [dealTermId], references: [id], onDelete: Cascade)
+  district District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  features EstateFeature[]
+  EstatePrimaryMedia Media? @relation("estatePrimaryMedia", fields: [primaryMediaId], references: [id], onDelete: SetNull)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  translations EstateTranslation[]
+
+  @@map("estates")
+}
+
+model Room {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates Estate[]
+  translations RoomTranslation[]
+  @@map("rooms")
+}
+
+model District {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+  cityId Int
+
+  createdAt DateTime @default (now())
+  updatedAt DateTime @updatedAt
+
+  city City @relation(fields: [cityId], references: [id])
+  estates Estate[]
+  translations DistrictTranslation[]
+
+  @@map("districts")
+}
+
+model City {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  districts District[]
+  translations CityTranslation[]
+
+  @@map("cities")
+}
+
+model CurrencyType {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates Estate[]
+
+  @@map("currency_types")
+}
+
+model DealTerm {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates Estate[]
+
+  @@map("deal_terms")
+}
+
+model EstateType {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+  canBeBought Boolean @default(true)
+  canBeRented Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates Estate[]
+  translations EstateTypeTranslation[]
+
+  @@map("estate_types")
+}
+
+model EstateFeature {
+  id Int @default(autoincrement()) @id
+  slug String @unique
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estates Estate[]
+  translations EstateFeatureTranslation[]
+
+  @@map("estate_features")
+}
+
+model Complaints {
+  id Int @default(autoincrement()) @id
+  senderId Int
+  receivedEstateId Int
+  reasonId Int
+  customReason String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  receivedEstate Estate @relation(fields: [receivedEstateId], references: [id], onDelete: Cascade)
+  reason ComplaintReason @relation(fields: [reasonId], references: [id], onDelete: Cascade)
+
+  @@map("complaints")
+}
+
+model ComplaintReason {
+  id Int @default(autoincrement()) @id
+  slug ComplaintReasonSlug
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  complaints Complaints[]
+  
+  @@map("complaint_reasons")
+}
+
+model Role {
+  id Int @default(autoincrement()) @id
+  name String @unique
+  slug String @unique
+  user User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations RoleTranslation[]
+
+  @@map("roles")
+}
+
+model Media {
+  id Int @default(autoincrement()) @id
+  order Int?
+  url String @unique
+  caption String?
+  size Int
+  entityId Int?
+  entityType String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userAvatar User? @relation("userAvatar")
+  estatePrimary Estate? @relation("estatePrimaryMedia")
+
+  @@index([entityType, entityId]) 
+  @@map("media")
+}
+
+model EstateTranslation {
+  id Int @default(autoincrement()) @id
+  estateId Int
+  locale String
+  description String? @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estate Estate @relation(fields: [estateId], references: [id], onDelete: Cascade)
+
+  @@map("estate_translations")
+}
+
+model UserTranslation {
+  id Int @default(autoincrement()) @id
+  userId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_translations")
+}
+
+model RoomTranslation {
+  id Int @default(autoincrement()) @id
+  roomId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  @@map("room_translations")
+}
+
+model DistrictTranslation {
+  id Int @default(autoincrement()) @id
+  districtId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  district District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+
+  @@map("district_translations")
+}
+model CityTranslation {
+  id Int @default(autoincrement()) @id
+  cityId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  @@map("city_translations")
+}
+
+model EstateTypeTranslation {
+  id Int @default(autoincrement()) @id
+  estateTypeId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estateType EstateType @relation(fields: [estateTypeId], references: [id], onDelete: Cascade)
+
+  @@map("estate_type_translations")
+}
+
+model EstateFeatureTranslation {
+  id Int @default(autoincrement()) @id
+  estateFeatureId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estateFeature EstateFeature @relation(fields: [estateFeatureId], references: [id], onDelete: Cascade)
+
+  @@map("estate_feature_translations")
+}
+
+model RoleTranslation {
+  id Int @default(autoincrement()) @id
+  roleId Int
+  locale String
+  name String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  @@map("role_translations")
+}
+
+enum ComplaintReasonSlug {
+  NOT_RELEVANT
+  INCORRECT_INFORMATION
+  OTHER
+}
