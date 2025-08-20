@@ -7,7 +7,7 @@ type Translatable = {
 };
 
 @Injectable()
-export abstract class TranslationService {
+export class TranslationService {
   translate<T extends Translatable>(
     data: T | T[],
     locale: string,

@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { EstateType } from '@prisma/client';
+import { District } from '@prisma/client';
 import { PropertyEntityService } from 'src/common/services/property-entity-service';
-import { CreateEstateTypeDto } from './dto/create-estate-type.dto';
+import { CreateDistrictDto } from './dto/create-district.dto';
 import { PrismaService } from 'src/prisma.service';
 import { TranslationService } from 'src/common/services/translation-service';
 
 @Injectable()
-export class EstateTypesService extends PropertyEntityService<
-  EstateType,
-  CreateEstateTypeDto
+export class DistrictsService extends PropertyEntityService<
+  District,
+  CreateDistrictDto
 > {
   constructor(prisma: PrismaService, translationService: TranslationService) {
-    super(prisma, 'EstateType', translationService);
+    super(prisma, 'District', translationService);
   }
 }
