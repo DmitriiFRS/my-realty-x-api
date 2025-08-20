@@ -1,0 +1,177 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { PrismaService } from 'src/prisma.service';
+import { FindOrCreateTgDto } from './dto/findOrCreateTg.dto';
+import { buildUserNameFromTg } from 'src/helpers/buildUserNameFromTg';
+import { Prisma } from '@prisma/client';
+import { nanoid } from 'nanoid';
+
+@Injectable()
+export class UsersService {
+  constructor(private prisma: PrismaService) {}
+
+  private async genUniqueSlug(attempts = 5): Promise<string> {
+    for (let i = 0; i < attempts; i++) {
+      const slug = `u-${Date.now()}-${nanoid(6)}`;
+      const exists = await this.prisma.user.findUnique({ where: { slug } });
+      if (!exists) return slug;
+    }
+    // fallback
+    return `u-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  }
+
+  async findOrCreateByTelegramId(dto: FindOrCreateTgDto) {
+    const { telegramId, phone, photoUrl } = dto;
+
+    if (!telegramId) throw new BadRequestException('telegramId is required');
+    if (!phone) throw new BadRequestException('phone is required');
+
+    const [userByTg, userByPhone] = await Promise.all([
+      this.prisma.user.findUnique({ where: { telegramId } }),
+      this.prisma.user.findUnique({ where: { phone } }),
+    ]);
+
+    if (userByTg && userByPhone && userByTg.id !== userByPhone.id) {
+      throw new ConflictException('Phone is already used by another account');
+    }
+
+    if (userByTg) {
+      // If phone belongs to another user -> conflict
+      if (userByPhone && userByPhone.id !== userByTg.id) {
+        throw new ConflictException('Phone is already used by another account');
+      }
+
+      // Prepare updates (name/photo/phone)
+      const updates: Record<string, any> = {};
+      const newName = buildUserNameFromTg(dto);
+
+      // Check name uniqueness if changing
+      if (newName && newName !== userByTg.name) {
+        const nameOwner = await this.prisma.user.findUnique({
+          where: { name: newName },
+        });
+        if (nameOwner && nameOwner.id !== userByTg.id) {
+          throw new ConflictException('Display name already in use');
+        }
+        updates.name = newName;
+      }
+
+      if (photoUrl && photoUrl !== userByTg.photo) updates.photo = photoUrl;
+
+      if (phone && phone !== userByTg.phone) {
+        // проверим, не занят ли этот номер другим
+        const phoneOwner = await this.prisma.user.findUnique({
+          where: { phone },
+        });
+        if (phoneOwner && phoneOwner.id !== userByTg.id) {
+          throw new ConflictException(
+            'Phone is already used by another account',
+          );
+        }
+        updates.phone = phone;
+      }
+
+      if (Object.keys(updates).length === 0) return userByTg;
+
+      try {
+        return await this.prisma.user.update({
+          where: { id: userByTg.id },
+          data: updates,
+        });
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new ConflictException(
+            'Unique constraint violation while updating user',
+          );
+        }
+        throw e;
+      }
+    }
+
+    // Case 2: user not found by telegramId
+
+    // If phone exists and already bound to another telegram -> conflict
+    if (userByPhone) {
+      if (userByPhone.telegramId && userByPhone.telegramId !== telegramId) {
+        throw new ConflictException(
+          'Phone number is already used by another account',
+        );
+      }
+
+      // We're going to attach telegramId to an existing userByPhone (no conflict)
+      const updates: Record<string, any> = {};
+      const newName = buildUserNameFromTg(dto);
+
+      if (newName && newName !== userByPhone.name) {
+        const nameOwner = await this.prisma.user.findUnique({
+          where: { name: newName },
+        });
+        if (nameOwner && nameOwner.id !== userByPhone.id) {
+          throw new ConflictException('Display name already in use');
+        }
+        updates.name = newName;
+      }
+
+      if (photoUrl && photoUrl !== userByPhone.photo) updates.photo = photoUrl;
+      updates.telegramId = telegramId;
+
+      try {
+        return await this.prisma.user.update({
+          where: { id: userByPhone.id },
+          data: updates,
+        });
+      } catch (e) {
+        if (
+          e instanceof Prisma.PrismaClientKnownRequestError &&
+          e.code === 'P2002'
+        ) {
+          throw new ConflictException(
+            'Unique constraint violation while linking telegram to phone',
+          );
+        }
+        throw e;
+      }
+    }
+
+    // Case 3: neither phone nor telegram exist -> create new user
+    const name = buildUserNameFromTg(dto);
+
+    // Ensure name is free (name is unique in schema)
+    const nameOwner = await this.prisma.user.findUnique({ where: { name } });
+    if (nameOwner) {
+      throw new ConflictException('Display name already in use');
+    }
+
+    const slug = await this.genUniqueSlug();
+
+    try {
+      const created = await this.prisma.user.create({
+        data: {
+          telegramId,
+          name,
+          slug,
+          photo: photoUrl ?? '',
+          phone,
+        },
+      });
+      return created;
+    } catch (e) {
+      // Final safety: if a race produced a P2002, translate it into ConflictException
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Unique constraint violation on user creation (phone/name/telegramId/slug)',
+        );
+      }
+      throw e;
+    }
+  }
+}

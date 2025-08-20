@@ -1,7 +1,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -11,7 +10,9 @@ datasource db {
 
 model User {
   id Int @default(autoincrement()) @id
+  telegramId String @unique
   name String @unique
+  slug String @unique
   rating Decimal @default(0) @db.Decimal(2, 1)
   photo String @default("")
   phone String @unique
