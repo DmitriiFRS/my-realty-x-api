@@ -3,6 +3,7 @@ import { EstatesService } from './estates.service';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CreateEstateDto } from './dto/create-estate.dto';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('estates')
 export class EstatesController {

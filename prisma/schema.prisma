@@ -10,7 +10,8 @@ datasource db {
 
 model User {
   id Int @default(autoincrement()) @id
-  telegramId String @unique
+  telegramId String? @unique
+  password String?
   name String @unique
   slug String @unique
   rating Decimal @default(0) @db.Decimal(2, 1)

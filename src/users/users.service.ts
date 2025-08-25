@@ -1,12 +1,8 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { FindOrCreateTgDto } from './dto/findOrCreateTg.dto';
 import { buildUserNameFromTg } from 'src/helpers/buildUserNameFromTg';
-import { Prisma } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 import { nanoid } from 'nanoid';
 
 @Injectable()
@@ -21,6 +17,15 @@ export class UsersService {
     }
     // fallback
     return `u-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  }
+
+  async findOne(phone: string): Promise<User | null> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        phone,
+      },
+    });
+    return user;
   }
 
   async findOrCreateByTelegramId(dto: FindOrCreateTgDto) {
@@ -67,9 +72,7 @@ export class UsersService {
           where: { phone },
         });
         if (phoneOwner && phoneOwner.id !== userByTg.id) {
-          throw new ConflictException(
-            'Phone is already used by another account',
-          );
+          throw new ConflictException('Phone is already used by another account');
         }
         updates.phone = phone;
       }
@@ -82,13 +85,8 @@ export class UsersService {
           data: updates,
         });
       } catch (e) {
-        if (
-          e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === 'P2002'
-        ) {
-          throw new ConflictException(
-            'Unique constraint violation while updating user',
-          );
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          throw new ConflictException('Unique constraint violation while updating user');
         }
         throw e;
       }
@@ -99,9 +97,7 @@ export class UsersService {
     // If phone exists and already bound to another telegram -> conflict
     if (userByPhone) {
       if (userByPhone.telegramId && userByPhone.telegramId !== telegramId) {
-        throw new ConflictException(
-          'Phone number is already used by another account',
-        );
+        throw new ConflictException('Phone number is already used by another account');
       }
 
       // We're going to attach telegramId to an existing userByPhone (no conflict)
@@ -127,13 +123,8 @@ export class UsersService {
           data: updates,
         });
       } catch (e) {
-        if (
-          e instanceof Prisma.PrismaClientKnownRequestError &&
-          e.code === 'P2002'
-        ) {
-          throw new ConflictException(
-            'Unique constraint violation while linking telegram to phone',
-          );
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+          throw new ConflictException('Unique constraint violation while linking telegram to phone');
         }
         throw e;
       }
@@ -163,13 +154,8 @@ export class UsersService {
       return created;
     } catch (e) {
       // Final safety: if a race produced a P2002, translate it into ConflictException
-      if (
-        e instanceof Prisma.PrismaClientKnownRequestError &&
-        e.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          'Unique constraint violation on user creation (phone/name/telegramId/slug)',
-        );
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException('Unique constraint violation on user creation (phone/name/telegramId/slug)');
       }
       throw e;
     }

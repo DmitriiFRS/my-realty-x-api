@@ -50,7 +50,7 @@ export class AuthService {
       throw new ForbiddenException('Доступ запрещен. Пользователь не найден или токен недействителен.');
     }
 
-    const refreshTokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken as string);
+    const refreshTokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken);
 
     if (!refreshTokenMatches) {
       throw new ForbiddenException('Доступ запрещен. Неверный токен.');
