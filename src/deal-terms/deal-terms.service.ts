@@ -6,11 +6,8 @@ import { CreateDealTermDto } from './dto/create-deal-term.dto';
 import { TranslationService } from 'src/common/services/translation-service';
 
 @Injectable()
-export class DealTermsService extends PropertyEntityService<
-  DealTerm,
-  CreateDealTermDto
-> {
+export class DealTermsService extends PropertyEntityService<DealTerm, CreateDealTermDto> {
   constructor(prisma: PrismaService, translationService: TranslationService) {
-    super(prisma, 'DealTerm', translationService);
+    super(prisma, 'DealTerm', translationService, false);
   }
 }

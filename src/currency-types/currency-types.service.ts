@@ -8,6 +8,6 @@ import { PrismaService } from 'src/prisma.service';
 @Injectable()
 export class CurrencyTypesService extends PropertyEntityService<CurrencyType, CreateCurrencyTypeDto> {
   constructor(prisma: PrismaService, translationService: TranslationService) {
-    super(prisma, 'CurrencyType', translationService);
+    super(prisma, 'CurrencyType', translationService, false);
   }
 }
