@@ -1,88 +1,167 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import * as crypto from 'crypto';
+import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { IUser } from 'src/types/user.type';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private config: ConfigService,
+    private readonly prisma: PrismaService,
     private usersService: UsersService,
     private jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
-  // Валидация initData от Telegram
-  validateTelegramInitData(initData: string) {
-    // initData — строка вида "id=...&first_name=...&auth_date=...&hash=..."
-    const params = new URLSearchParams(initData);
-    const receivedHash = params.get('hash') ?? '';
-    // Собираем пары key=value, кроме hash
-    const pairs: string[] = [];
-    for (const [k, v] of params.entries()) {
-      if (k === 'hash') continue;
-      pairs.push(`${k}=${v}`);
+  async validateUser(phone: string, password: string): Promise<any> {
+    const user = await this.usersService.findOne(phone);
+    const passwordIsMatch = user?.password ? await bcrypt.compare(password, user.password as string) : false;
+    if (user && passwordIsMatch) {
+      return user;
     }
-    pairs.sort(); // алфавитный порядок
-    const dataCheckString = pairs.join('\n');
-
-    // secret = SHA256(bot_token)
-    const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN') || '';
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-    const secretKey = crypto.createHash('sha256').update(botToken).digest();
-    // HMAC-SHA256(data_check_string, secretKey)
-    const hmac = crypto
-      .createHmac('sha256', secretKey)
-      .update(dataCheckString)
-      .digest('hex');
-
-    // Защищённое сравнение
-    const hmacBuf = Buffer.from(hmac, 'hex');
-    const recvBuf = Buffer.from(receivedHash, 'hex');
-    if (
-      hmacBuf.length !== recvBuf.length ||
-      !crypto.timingSafeEqual(hmacBuf, recvBuf)
-    ) {
-      throw new UnauthorizedException(
-        'Invalid Telegram initData (hash mismatch)',
-      );
-    }
-
-    // Проверка свежести (настраиваемо)
-    const authDate = Number(params.get('auth_date') ?? '0');
-    const ageSeconds = Math.floor(Date.now() / 1000) - authDate;
-    if (ageSeconds > 60 * 60 * 24) {
-      // например, 24 часа
-      throw new UnauthorizedException('initData expired');
-    }
-
-    // Вернём разобранный объект (без hash)
-    const result: Record<string, string> = {};
-    for (const [k, v] of params.entries()) {
-      if (k === 'hash') continue;
-      result[k] = v;
-    }
-    return result;
+    throw new UnauthorizedException('Неправильный номер телефона или пароль');
   }
 
-  async loginWithTelegram(initData: string) {
-    const payload = this.validateTelegramInitData(initData); // throws если невалидно
+  async login(user: IUser) {
+    const tokens = await this.getTokens(user.id, user.phone);
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    return tokens;
+  }
 
-    // payload.id — Telegram user id (string), payload.username, payload.first_name, photo_url...
-    const telegramId = payload.id;
-    // findOrCreate пользователя через UsersService (Prisma)
-    const user = await this.usersService.findOrCreateByTelegramId({
-      telegramId,
-      username: payload.username,
-      firstName: payload.first_name,
-      lastName: payload.last_name,
-      photoUrl: payload.photo_url,
-      phone: payload.phone_number,
+  async logout(userId: number) {
+    await this.prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        hashedRefreshToken: null,
+      },
+    });
+  }
+
+  async refreshTokens(userId: number, refreshToken: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
     });
 
-    // Подпись JWT — можно положить sub: user.id и telegramId
-    const token = this.jwtService.sign({ sub: user.id, tid: telegramId });
+    if (!user || !user.hashedRefreshToken) {
+      throw new ForbiddenException('Доступ запрещен. Пользователь не найден или токен недействителен.');
+    }
 
-    return { access_token: token, user };
+    const refreshTokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken as string);
+
+    if (!refreshTokenMatches) {
+      throw new ForbiddenException('Доступ запрещен. Неверный токен.');
+    }
+
+    const tokens = await this.getTokens(user.id, user.phone);
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    return tokens;
   }
+
+  private async updateRefreshToken(userId: number, refreshToken: string) {
+    const salt = await bcrypt.genSalt();
+    const hashedToken = await bcrypt.hash(refreshToken, salt);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { hashedRefreshToken: hashedToken },
+    });
+  }
+
+  private async getTokens(userId: number, phone: string) {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(
+        {
+          sub: userId,
+          phone,
+        },
+        {
+          secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
+          expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRATION'),
+        },
+      ),
+      this.jwtService.signAsync(
+        {
+          sub: userId,
+          phone,
+        },
+        {
+          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION'),
+        },
+      ),
+    ]);
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  // // Валидация initData от Telegram
+  // validateTelegramInitData(initData: string) {
+  //   // initData — строка вида "id=...&first_name=...&auth_date=...&hash=..."
+  //   const params = new URLSearchParams(initData);
+  //   const receivedHash = params.get('hash') ?? '';
+  //   // Собираем пары key=value, кроме hash
+  //   const pairs: string[] = [];
+  //   for (const [k, v] of params.entries()) {
+  //     if (k === 'hash') continue;
+  //     pairs.push(`${k}=${v}`);
+  //   }
+  //   pairs.sort(); // алфавитный порядок
+  //   const dataCheckString = pairs.join('\n');
+
+  //   // secret = SHA256(bot_token)
+  //   const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN') || '';
+  //   // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  //   const secretKey = crypto.createHash('sha256').update(botToken).digest();
+  //   // HMAC-SHA256(data_check_string, secretKey)
+  //   const hmac = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  //   // Защищённое сравнение
+  //   const hmacBuf = Buffer.from(hmac, 'hex');
+  //   const recvBuf = Buffer.from(receivedHash, 'hex');
+  //   if (hmacBuf.length !== recvBuf.length || !crypto.timingSafeEqual(hmacBuf, recvBuf)) {
+  //     throw new UnauthorizedException('Invalid Telegram initData (hash mismatch)');
+  //   }
+
+  //   // Проверка свежести (настраиваемо)
+  //   const authDate = Number(params.get('auth_date') ?? '0');
+  //   const ageSeconds = Math.floor(Date.now() / 1000) - authDate;
+  //   if (ageSeconds > 60 * 60 * 24) {
+  //     // например, 24 часа
+  //     throw new UnauthorizedException('initData expired');
+  //   }
+
+  //   // Вернём разобранный объект (без hash)
+  //   const result: Record<string, string> = {};
+  //   for (const [k, v] of params.entries()) {
+  //     if (k === 'hash') continue;
+  //     result[k] = v;
+  //   }
+  //   return result;
+  // }
+
+  // async loginWithTelegram(initData: string) {
+  //   const payload = this.validateTelegramInitData(initData); // throws если невалидно
+
+  //   // payload.id — Telegram user id (string), payload.username, payload.first_name, photo_url...
+  //   const telegramId = payload.id;
+  //   // findOrCreate пользователя через UsersService (Prisma)
+  //   const user = await this.usersService.findOrCreateByTelegramId({
+  //     telegramId,
+  //     username: payload.username,
+  //     firstName: payload.first_name,
+  //     lastName: payload.last_name,
+  //     photoUrl: payload.photo_url,
+  //     phone: payload.phone_number,
+  //   });
+
+  //   // Подпись JWT — можно положить sub: user.id и telegramId
+  //   const token = this.jwtService.sign({ sub: user.id, tid: telegramId });
+
+  //   return { access_token: token, user };
+  // }
 }

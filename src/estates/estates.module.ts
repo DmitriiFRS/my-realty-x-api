@@ -3,9 +3,10 @@ import { EstatesService } from './estates.service';
 import { EstatesController } from './estates.controller';
 import { PrismaService } from 'src/prisma.service';
 import { TranslationService } from 'src/common/services/translation-service';
+import { UploadsService } from 'src/uploads/uploads.service';
 
 @Module({
   controllers: [EstatesController],
-  providers: [EstatesService, PrismaService, TranslationService],
+  providers: [EstatesService, PrismaService, TranslationService, UploadsService],
 })
 export class EstatesModule {}

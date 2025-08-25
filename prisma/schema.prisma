@@ -20,6 +20,7 @@ model User {
   avatarMediaId Int? @unique
   avatarMedia Media? @relation("userAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
   avatarUrl String?
+  hashedRefreshToken String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -59,9 +60,34 @@ model Estate {
   features EstateFeature[]
   EstatePrimaryMedia Media? @relation("estatePrimaryMedia", fields: [primaryMediaId], references: [id], onDelete: SetNull)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status EstateStatus?
+  views EstateView?
   translations EstateTranslation[]
 
   @@map("estates")
+}
+
+model EstateStatus {
+  id Int @default(autoincrement()) @id
+  estateId Int @unique
+  estate Estate @relation(fields: [estateId], references: [id], onDelete: Cascade)
+  status EstateStatusEnum @default(PENDING)
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("estate_statuses")
+}
+
+model EstateView {
+  id        Int      @id @default(autoincrement())
+  estateId  Int @unique
+  count     Int      @default(0)
+  
+  estate    Estate   @relation(fields: [estateId], references: [id], onDelete: Cascade)
+
+  @@map("estate_views")
 }
 
 model Room {
@@ -326,4 +352,10 @@ enum ComplaintReasonSlug {
   NOT_RELEVANT
   INCORRECT_INFORMATION
   OTHER
+}
+
+enum EstateStatusEnum {
+  PENDING @map("pending")
+  VERIFIED @map("verified")
+  REJECTED @map("rejected")
 }
