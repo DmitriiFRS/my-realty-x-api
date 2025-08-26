@@ -11,9 +11,21 @@ import { UploadsModule } from './uploads/uploads.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { CitiesModule } from './cities/cities.module';
 import { CurrencyTypesModule } from './currency-types/currency-types.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
-  imports: [UsersModule, EstateTypesModule, DistrictsModule, DealTermsModule, EstatesModule, UploadsModule, RoomsModule, CitiesModule, CurrencyTypesModule],
+  imports: [
+    AuthModule,
+    UsersModule,
+    EstateTypesModule,
+    DistrictsModule,
+    DealTermsModule,
+    EstatesModule,
+    UploadsModule,
+    RoomsModule,
+    CitiesModule,
+    CurrencyTypesModule,
+  ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
 })

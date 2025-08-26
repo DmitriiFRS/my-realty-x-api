@@ -5,8 +5,27 @@ import { join } from 'path';
 import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
+  BigInt.prototype['toJSON'] = function () {
+    return this.toString();
+  };
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api');
+  const allowedOrigins = ['http://localhost:3000'];
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Домен не разрешен политикой CORS'));
+      }
+    },
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
+
   const uploadsPath = join(__dirname, '..', '..', 'uploads');
   app.useGlobalPipes(
     new ValidationPipe({

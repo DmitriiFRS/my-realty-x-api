@@ -5,9 +5,8 @@ export class FindOrCreateTgDto {
   @IsNotEmpty()
   telegramId: string;
 
-  @IsOptional()
   @IsString()
-  name?: string | null;
+  name: string;
 
   @IsString()
   @IsNotEmpty()

@@ -1,10 +1,11 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { IUser } from 'src/types/user.type';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma.service';
+import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +18,7 @@ export class AuthService {
 
   async validateUser(phone: string, password: string): Promise<any> {
     const user = await this.usersService.findOne(phone);
-    const passwordIsMatch = user?.password ? await bcrypt.compare(password, user.password as string) : false;
+    const passwordIsMatch = user?.password ? await bcrypt.compare(password, user.password) : false;
     if (user && passwordIsMatch) {
       return user;
     }
@@ -39,6 +40,37 @@ export class AuthService {
         hashedRefreshToken: null,
       },
     });
+  }
+
+  async register(dto: RegisterDto) {
+    const existingUser = await this.usersService.findOne(dto.phone);
+    if (existingUser) {
+      throw new ConflictException('Пользователь с таким номером телефона уже существует');
+    }
+
+    const existingUserByName = await this.prisma.user.findUnique({
+      where: { name: dto.name },
+    });
+    if (existingUserByName) {
+      throw new ConflictException('Пользователь с таким именем уже существует');
+    }
+
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(dto.password, salt);
+
+    const timestamp = Date.now().toString().slice(-8);
+    const randomPart = Math.random().toString().substring(2, 8);
+    const uniqueSlug = (randomPart + timestamp).slice(0, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        phone: dto.phone,
+        name: dto.name,
+        password: hashedPassword,
+        slug: uniqueSlug,
+      },
+    });
+    return this.login(user as IUser);
   }
 
   async refreshTokens(userId: number, refreshToken: string) {

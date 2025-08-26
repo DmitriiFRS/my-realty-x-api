@@ -1,10 +1,11 @@
-import { Controller, HttpCode, HttpStatus, Post, UseGuards, Request, Body } from '@nestjs/common';
+import { Controller, HttpCode, HttpStatus, Post, UseGuards, Request, Body, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { IUser } from 'src/types/user.type';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
+import { RegisterDto } from './dto/register.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -22,6 +23,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(@GetUser('id') userId: number) {
     return await this.authService.logout(userId);
+  }
+
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @UsePipes(new ValidationPipe())
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
   }
 
   @Post('refresh')
