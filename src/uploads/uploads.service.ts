@@ -80,4 +80,24 @@ export class UploadsService {
       }
     }
   }
+
+  public async getMediaById(entityType: EntityType, entityId: number) {
+    const media = await this.prisma.media.findMany({
+      where: {
+        entityType: entityType,
+        entityId: entityId,
+      },
+      select: {
+        id: true,
+        order: true,
+        url: true,
+        size: true,
+        entityId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return media;
+  }
 }
