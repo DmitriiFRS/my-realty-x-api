@@ -10,7 +10,7 @@ async function bootstrap() {
   };
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api');
-  const allowedOrigins = ['http://localhost:3000'];
+  const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001'];
 
   app.enableCors({
     origin: (origin, callback) => {

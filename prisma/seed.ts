@@ -23,11 +23,11 @@ async function main() {
 
   await prisma.room.createMany({
     data: [
-      { id: 1, slug: '1', name: 'Одна комната' },
-      { id: 2, slug: '2', name: 'Две комнаты' },
-      { id: 3, slug: '3', name: 'Три комнаты' },
-      { id: 4, slug: '4', name: 'Четыре комнаты' },
-      { id: 5, slug: '5', name: 'Больше пяти' },
+      { id: 1, slug: 'one', name: 'Одна комната' },
+      { id: 2, slug: 'two', name: 'Две комнаты' },
+      { id: 3, slug: 'three', name: 'Три комнаты' },
+      { id: 4, slug: 'four', name: 'Четыре комнаты' },
+      { id: 5, slug: 'moreThanFive', name: 'Больше пяти' },
     ],
     skipDuplicates: true,
   });
