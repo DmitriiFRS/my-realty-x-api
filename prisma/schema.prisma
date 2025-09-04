@@ -43,6 +43,7 @@ model Estate {
   dealTermId Int
   estateTypeId Int
   roomId Int?
+  cityId Int?
   districtId Int
   currencyTypeId Int
   primaryMediaId Int? @unique
@@ -54,6 +55,7 @@ model Estate {
 
   complaints Complaints[]
   room Room? @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  city City? @relation(fields: [cityId], references: [id], onDelete: SetNull)
   estateType EstateType @relation(fields: [estateTypeId], references: [id], onDelete: Cascade)
   currencyType CurrencyType @relation(fields: [currencyTypeId], references: [id], onDelete: Cascade)
   dealTerm DealTerm @relation(fields: [dealTermId], references: [id], onDelete: Cascade)
@@ -128,6 +130,7 @@ model City {
   updatedAt DateTime @updatedAt
 
   districts District[]
+  estates Estate[]
   translations CityTranslation[]
 
   @@map("cities")

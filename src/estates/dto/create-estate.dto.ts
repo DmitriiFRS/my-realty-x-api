@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsArray, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateEstateDto {
   @IsString()
@@ -37,5 +37,25 @@ export class CreateEstateDto {
   @IsInt()
   @Min(1)
   @Type(() => Number)
+  cityId: number;
+
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
   currencyTypeId: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value).map(Number);
+      } catch {
+        return [];
+      }
+    }
+    return Array.isArray(value) ? value.map(Number) : [];
+  })
+  @IsArray()
+  @IsInt({ each: true })
+  features?: number[];
 }

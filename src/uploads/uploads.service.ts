@@ -100,4 +100,19 @@ export class UploadsService {
 
     return media;
   }
+
+  public async deleteFiles(fileUrls: string[]): Promise<void> {
+    await Promise.all(fileUrls.map((url) => this.deleteSingleFile(url)));
+  }
+
+  private async deleteSingleFile(fileUrl: string) {
+    try {
+      const fullPath = path.join(process.cwd(), fileUrl);
+      await fs.unlink(fullPath);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        console.error(`Ошибка при удалении файла ${fileUrl}:`, error);
+      }
+    }
+  }
 }

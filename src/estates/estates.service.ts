@@ -25,11 +25,33 @@ export class EstatesService {
     );
   }
 
+  async getVerifiedEstates() {
+    return this.getEstates(
+      1,
+      10,
+      { status: { status: 'VERIFIED' } },
+      {
+        select: getEstatesSelect,
+      },
+    );
+  }
+
+  async getRejectedEstates() {
+    return this.getEstates(
+      1,
+      10,
+      { status: { status: 'REJECTED' } },
+      {
+        select: getEstatesSelect,
+      },
+    );
+  }
+
   async createEstate(userId: number, dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {
     if (!files.primaryImage || files.primaryImage.length === 0) {
       throw new BadRequestException('Для создания объявления требуется хотя бы одно изображение.');
     }
-    const { area, description, price, currencyTypeId, dealTermId, districtId, estateTypeId, roomId } = dto;
+    const { area, description, price, currencyTypeId, dealTermId, districtId, estateTypeId, roomId, features } = dto;
 
     const timestamp = Date.now().toString().slice(-8);
     const randomPart = Math.random().toString().substring(2, 8);
@@ -45,11 +67,18 @@ export class EstatesService {
           description,
           area,
           price,
+          city: { connect: { id: dto.cityId } },
           currencyType: { connect: { id: currencyTypeId } },
           dealTerm: { connect: { id: dealTermId } },
           district: { connect: { id: districtId } },
           estateType: { connect: { id: estateTypeId } },
           room: roomId ? { connect: { id: roomId } } : undefined,
+          features:
+            features && features.length > 0
+              ? {
+                  connect: features.map((id) => ({ id })),
+                }
+              : undefined,
         },
       });
 
@@ -107,10 +136,13 @@ export class EstatesService {
       where: { id: estateId },
       select: getEstatesSelect,
     });
+    if (!estate) throw new BadRequestException('Объявление не найдено');
     const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estateId);
+    const filteredMedia = media.filter((m) => m.id !== estate.EstatePrimaryMedia?.id);
+
     const estateWithMedia = {
       ...estate,
-      media: media,
+      media: filteredMedia,
     };
 
     return {
@@ -144,6 +176,15 @@ export class EstatesService {
     return this.updateEstate({ estateUserId: user.id, estateId, dto, files, isUser: true });
   }
 
+  async adminDeleteEstate(userId: number, estateId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    return this.deleteEstate(estateId);
+  }
+
+  /* =================== PRIVATE ================== */
   private async updateEstate({
     estateUserId,
     estateId,
@@ -163,20 +204,39 @@ export class EstatesService {
     if (!estate) throw new BadRequestException('Объявление не найдено');
     if (isUser && estate.userId !== estateUserId) throw new BadRequestException('Редактировать объявление может только его создатель');
 
-    const { area, description, price, currencyTypeId, dealTermId, districtId, estateTypeId, roomId, status, existingImageIds } = dto;
-
+    const { area, description, price, currencyTypeId, dealTermId, districtId, estateTypeId, roomId, features, status, existingImageIds } =
+      dto;
     const newPrimaryImageFile = files?.primaryImage?.[0];
     const newImageFiles = files?.images || [];
 
     return this.prisma.$transaction(async (prisma) => {
-      if (existingImageIds && existingImageIds.length > 0) {
-        await prisma.media.deleteMany({
-          where: {
-            id: { in: existingImageIds },
-            entityId: estateId,
-            entityType: EntityType.ESTATE,
-          },
-        });
+      const currentMedia = await prisma.media.findMany({
+        where: {
+          entityId: estateId,
+          entityType: EntityType.ESTATE,
+        },
+        select: { id: true },
+      });
+
+      const currentIds = currentMedia.map((m) => m.id);
+      if (Array.isArray(existingImageIds)) {
+        if (existingImageIds.length === 0) {
+          await prisma.media.deleteMany({
+            where: {
+              entityId: estateId,
+              entityType: EntityType.ESTATE,
+            },
+          });
+        } else {
+          const idsToDelete = currentIds.filter((id) => !existingImageIds.includes(id));
+          if (idsToDelete.length > 0) {
+            await prisma.media.deleteMany({
+              where: {
+                id: { in: idsToDelete },
+              },
+            });
+          }
+        }
       }
       if (newImageFiles.length > 0) {
         await Promise.all(
@@ -223,6 +283,7 @@ export class EstatesService {
           district: { connect: { id: districtId } },
           estateType: { connect: { id: estateTypeId } },
           room: roomId ? { connect: { id: roomId } } : undefined,
+          features: features !== undefined ? { set: features.map((id) => ({ id })) } : undefined,
           ...primaryImageUpdateData,
         },
       });
@@ -253,6 +314,7 @@ export class EstatesService {
       return estate;
     });
   }
+
   private async getEstates(
     page: number = 1,
     pageSize: number = 10,
@@ -295,7 +357,7 @@ export class EstatesService {
     });
     const estatesWithMedia = estates.map((estate) => ({
       ...estate,
-      media: media.filter((m) => m.entityId === estate.id),
+      media: media.filter((m) => m.entityId === estate.id && m.id !== estate.primaryMediaId),
     }));
 
     return {
@@ -308,6 +370,41 @@ export class EstatesService {
       },
     };
   }
-}
 
-// userId: number | null, estateUserId: number, estateId: number, dto: CreateEstateDto, isUser?: boolean
+  private async deleteEstate(estateId: number) {
+    const estate = await this.prisma.estate.findUnique({
+      where: { id: estateId },
+      include: {
+        EstatePrimaryMedia: true,
+      },
+    });
+    if (!estate) throw new BadRequestException('Объявление не найдено');
+
+    const mediaToDelete = await this.prisma.media.findMany({
+      where: {
+        entityId: estateId,
+        entityType: EntityType.ESTATE,
+      },
+      select: {
+        url: true, // Нам нужны только их URL
+      },
+    });
+    const urlsToDelete = mediaToDelete.map((media) => media.url);
+
+    return this.prisma.$transaction(async (prisma) => {
+      await prisma.media.deleteMany({
+        where: {
+          entityId: estateId,
+          entityType: EntityType.ESTATE,
+        },
+      });
+      await prisma.estate.delete({
+        where: { id: estateId },
+      });
+      if (urlsToDelete.length > 0) {
+        await this.uploadsService.deleteFiles(urlsToDelete);
+      }
+      return { message: 'Объявление и связанные файлы успешно удалены' };
+    });
+  }
+}

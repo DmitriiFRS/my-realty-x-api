@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { EstatesService } from './estates.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateEstateDto } from './dto/create-estate.dto';
@@ -13,9 +13,18 @@ export class EstatesController {
   constructor(private readonly estatesService: EstatesService) {}
 
   @Get('pending')
-  async getAllEstates() {
+  async getPendingEstates() {
     return this.estatesService.getPendingEstates();
   }
+  @Get('active')
+  async getVerifiedEstates() {
+    return this.estatesService.getVerifiedEstates();
+  }
+  @Get('rejected')
+  async getRejectedEstates() {
+    return this.estatesService.getRejectedEstates();
+  }
+
   @Get('/estate/:id')
   async getEstateById(@Param('id') id: number) {
     return this.estatesService.getEstateById(8, id);
@@ -100,5 +109,10 @@ export class EstatesController {
     @UploadedFiles() files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
   ) {
     return this.estatesService.createEstate(5, dto, files);
+  }
+
+  @Delete('/admin-delete/:id')
+  async deleteEstateByAdmin(@Param('id') id: number) {
+    return this.estatesService.adminDeleteEstate(5, id);
   }
 }

@@ -14,6 +14,12 @@ export const getEstatesSelect = {
       phone: true,
     },
   },
+  status: {
+    select: {
+      id: true,
+      status: true,
+    },
+  },
   currencyType: {
     select: {
       id: true,
@@ -22,6 +28,13 @@ export const getEstatesSelect = {
     },
   },
   dealTerm: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+  },
+  city: {
     select: {
       id: true,
       name: true,
@@ -47,6 +60,18 @@ export const getEstatesSelect = {
       id: true,
       name: true,
       slug: true,
+    },
+  },
+  features: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+    },
+  },
+  EstatePrimaryMedia: {
+    select: {
+      id: true,
     },
   },
 };

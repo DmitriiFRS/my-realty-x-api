@@ -48,6 +48,14 @@ async function main() {
       },
     },
   });
+  await prisma.estateFeature.createMany({
+    data: [
+      { id: 1, slug: 'renovated', name: 'Ремонт' },
+      { id: 2, slug: 'furnished', name: 'Мебель' },
+      { id: 3, slug: 'owner', name: 'Собственник' },
+    ],
+    skipDuplicates: true,
+  });
   console.log('✅ Сидинг успешно завершен.');
 }
 

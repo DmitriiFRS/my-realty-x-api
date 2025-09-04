@@ -12,6 +12,7 @@ import { RoomsModule } from './rooms/rooms.module';
 import { CitiesModule } from './cities/cities.module';
 import { CurrencyTypesModule } from './currency-types/currency-types.module';
 import { AuthModule } from './auth/auth.module';
+import { EstateFeaturesModule } from './estate-features/estate-features.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthModule } from './auth/auth.module';
     RoomsModule,
     CitiesModule,
     CurrencyTypesModule,
+    EstateFeaturesModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
