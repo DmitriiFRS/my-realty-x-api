@@ -1,16 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { EstatesService } from './estates.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateEstateDto } from './dto/create-estate.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { UpdateEstateDto } from './dto/update-estate.dto';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('estates')
 export class EstatesController {
   constructor(private readonly estatesService: EstatesService) {}
+
+  @Get('offers')
+  async getOffersEstate(@Query() query: PaginationDto) {
+    return this.estatesService.getOffers(query.page, query.limit);
+  }
 
   @Get('pending')
   async getPendingEstates() {
@@ -28,6 +34,11 @@ export class EstatesController {
   @Get('/estate/:id')
   async getEstateById(@Param('id') id: number) {
     return this.estatesService.getEstateById(8, id);
+  }
+
+  @Get('estate/slug/:slug')
+  async getEstateBySlug(@Param('slug') slug: string) {
+    return this.estatesService.getEstateBySlug(slug);
   }
 
   @Put('/admin-update/:id')

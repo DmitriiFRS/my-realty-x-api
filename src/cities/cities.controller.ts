@@ -8,6 +8,6 @@ export class CitiesController {
   @Get()
   getCities(@Headers() headers: Record<string, string>) {
     const locale = headers['accept-language'] || 'ru';
-    return this.citiesService.findMany(locale);
+    return this.citiesService.findMany(locale, { districts: { select: { id: true, name: true, slug: true } } });
   }
 }

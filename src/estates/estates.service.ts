@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreateEstateDto } from './dto/create-estate.dto';
 import { UploadsService } from 'src/uploads/uploads.service';
@@ -14,26 +14,16 @@ export class EstatesService {
     private uploadsService: UploadsService,
   ) {}
 
+  async getOffers(page: number = 1, limit: number = 4) {
+    return this.getEstates(page, limit, { status: { status: 'VERIFIED' } }, { select: getEstatesSelect });
+  }
+
   async getPendingEstates() {
-    return this.getEstates(
-      1,
-      10,
-      { status: { status: 'PENDING' } },
-      {
-        select: getEstatesSelect,
-      },
-    );
+    return this.getEstates(1, 10, { status: { status: 'PENDING' } }, { select: getEstatesSelect });
   }
 
   async getVerifiedEstates() {
-    return this.getEstates(
-      1,
-      10,
-      { status: { status: 'VERIFIED' } },
-      {
-        select: getEstatesSelect,
-      },
-    );
+    return this.getEstates(1, 10, { status: { status: 'VERIFIED' } }, { select: getEstatesSelect });
   }
 
   async getRejectedEstates() {
@@ -45,6 +35,32 @@ export class EstatesService {
         select: getEstatesSelect,
       },
     );
+  }
+
+  async getEstateBySlug(slug: string) {
+    const estate = await this.prisma.estate.findUnique({
+      where: { slug },
+      include: {
+        features: {
+          select: { id: true, name: true, slug: true },
+        },
+        city: {
+          select: { id: true, name: true, slug: true },
+        },
+        district: {
+          select: { id: true, name: true, slug: true },
+        },
+        room: {
+          select: { id: true, name: true, slug: true },
+        },
+      },
+    });
+
+    if (!estate) return new NotFoundException('Объявление не найдено');
+
+    const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estate.id);
+
+    return { data: { ...estate, media } };
   }
 
   async createEstate(userId: number, dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {
@@ -208,33 +224,36 @@ export class EstatesService {
       dto;
     const newPrimaryImageFile = files?.primaryImage?.[0];
     const newImageFiles = files?.images || [];
-
+    const primaryId = estate.primaryMediaId ?? null;
+    console.log(existingImageIds);
     return this.prisma.$transaction(async (prisma) => {
       const currentMedia = await prisma.media.findMany({
         where: {
           entityId: estateId,
           entityType: EntityType.ESTATE,
         },
-        select: { id: true },
+        select: { id: true, url: true },
       });
 
       const currentIds = currentMedia.map((m) => m.id);
       if (Array.isArray(existingImageIds)) {
         if (existingImageIds.length === 0) {
-          await prisma.media.deleteMany({
-            where: {
-              entityId: estateId,
-              entityType: EntityType.ESTATE,
-            },
-          });
+          const idsToDelete = currentIds.filter((id) => id !== primaryId);
+          if (idsToDelete.length > 0) {
+            await prisma.media.deleteMany({ where: { id: { in: idsToDelete } } });
+            const mediaToDelete = currentMedia.filter((m) => idsToDelete.includes(m.id));
+            await this.uploadsService.deleteFiles(mediaToDelete.map((m) => m.url));
+          }
         } else {
-          const idsToDelete = currentIds.filter((id) => !existingImageIds.includes(id));
+          const idsToDelete = currentIds.filter((id) => !existingImageIds.includes(id) && id !== primaryId);
           if (idsToDelete.length > 0) {
             await prisma.media.deleteMany({
               where: {
                 id: { in: idsToDelete },
               },
             });
+            const mediaToDelete = currentMedia.filter((m) => idsToDelete.includes(m.id));
+            await this.uploadsService.deleteFiles(mediaToDelete.map((m) => m.url));
           }
         }
       }
@@ -317,7 +336,7 @@ export class EstatesService {
 
   private async getEstates(
     page: number = 1,
-    pageSize: number = 10,
+    pageSize: number = 4,
     where: Prisma.EstateWhereInput,
     queryArgs: {
       select?: Prisma.EstateSelect;
