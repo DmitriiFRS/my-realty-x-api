@@ -25,7 +25,7 @@ jobs:
         run: npm run build
 
       - name: Build Seed Script
-        run: npx tsc prisma/seed.ts --outDir dist/prisma
+        run: npx tsc --project tsconfig.json prisma/seed.ts --outDir dist/prisma
 
       - name: Create .env file
         run: |
