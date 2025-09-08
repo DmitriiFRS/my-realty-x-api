@@ -24,9 +24,6 @@ jobs:
       - name: Build Nest.js Application
         run: npm run build
 
-      - name: Build Seed Script
-        run: npx tsc --project tsconfig.json prisma/seed.ts --outDir dist/prisma
-
       - name: Create .env file
         run: |
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
@@ -60,6 +57,5 @@ jobs:
             npm install --production
             npx prisma generate
             npx prisma migrate deploy
-            node dist/prisma/seed.js
-            pm2 startOrRestart --name "api" dist/src/main.js
+            pm2 restart api || pm2 start --name "api" dist/src/main.js
           EOF
