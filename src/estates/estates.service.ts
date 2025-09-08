@@ -6,6 +6,7 @@ import { EntityType } from 'src/uploads/enums/entity-type.enum';
 import { Prisma } from '@prisma/client';
 import { getEstatesSelect } from './select/getEstates.select';
 import { UpdateEstateDto } from './dto/update-estate.dto';
+import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
 
 @Injectable()
 export class EstatesService {
@@ -57,10 +58,54 @@ export class EstatesService {
     });
 
     if (!estate) return new NotFoundException('Объявление не найдено');
-
     const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estate.id);
-
     return { data: { ...estate, media } };
+  }
+
+  async getFilteredEstates(dto: GetFilteredEstatesDto) {
+    const { cityId, districtId, areaFrom, areaTo, currencyTypeId, dealTermId, priceFrom, priceTo, features, page = 1, limit = 2 } = dto;
+
+    const filters: Prisma.EstateWhereInput = {
+      status: { status: 'VERIFIED' },
+      cityId: cityId ? Number(cityId) : undefined,
+      districtId: districtId ? Number(districtId) : undefined,
+      area: areaFrom || areaTo ? { gte: areaFrom ?? 0, lte: areaTo ?? 9999 } : undefined,
+      currencyTypeId: currencyTypeId ? Number(currencyTypeId) : undefined,
+      dealTermId: dealTermId ? Number(dealTermId) : undefined,
+      price: priceFrom || priceTo ? { gte: priceFrom ?? 0, lte: priceTo ?? 1000000000000 } : undefined,
+      features: features && features.length > 0 ? { some: { id: { in: features.map((id) => Number(id)) } } } : undefined,
+    };
+
+    const skip = (page - 1) * limit;
+    const take = limit;
+
+    const [estates, total] = await Promise.all([
+      this.prisma.estate.findMany({
+        where: filters,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        select: getEstatesSelect,
+      }),
+      this.prisma.estate.count({ where: filters }),
+    ]);
+
+    const estateIds = estates.map((estate) => estate.id);
+    const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estateIds);
+    const estatesWithMedia = estates.map((estate) => ({
+      ...estate,
+      media: media.filter((m) => m.entityId === estate.id),
+    }));
+
+    return {
+      data: estatesWithMedia,
+      meta: {
+        total,
+        page,
+        limit,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
   }
 
   async createEstate(userId: number, dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {

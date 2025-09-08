@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { EstatesService } from './estates.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { CreateEstateDto } from './dto/create-estate.dto';
@@ -6,6 +20,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { UpdateEstateDto } from './dto/update-estate.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
@@ -39,6 +54,17 @@ export class EstatesController {
   @Get('estate/slug/:slug')
   async getEstateBySlug(@Param('slug') slug: string) {
     return this.estatesService.getEstateBySlug(slug);
+  }
+
+  @Get('filtered')
+  @UsePipes(
+    new ValidationPipe({
+      forbidNonWhitelisted: false,
+    }),
+  )
+  async getFilteredEstates(@Query() query: GetFilteredEstatesDto) {
+    console.log(query);
+    return this.estatesService.getFilteredEstates(query);
   }
 
   @Put('/admin-update/:id')

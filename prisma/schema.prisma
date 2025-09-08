@@ -352,6 +352,26 @@ model RoleTranslation {
   @@map("role_translations")
 }
 
+model SmsVerification {
+  id        Int                 @id @default(autoincrement())
+  phone     String
+  code      String
+  type      SmsVerificationType
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([phone, type])
+  @@map("sms_verifications")
+}
+
+enum SmsVerificationType {
+  REGISTRATION
+  LOGIN
+  PASSWORD_RESET
+}
+
 enum ComplaintReasonSlug {
   NOT_RELEVANT
   INCORRECT_INFORMATION

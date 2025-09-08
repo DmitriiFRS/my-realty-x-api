@@ -1,11 +1,14 @@
-import { ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { IUser } from 'src/types/user.type';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from 'src/prisma.service';
-import { RegisterDto } from './dto/register.dto';
+import { SmsVerificationType } from '@prisma/client';
+import { SmsService } from 'src/sms/sms.service';
+import { nanoid } from 'nanoid';
+import { VerifySmsCodeDto } from './dto/verify-sms-code.dto';
 
 @Injectable()
 export class AuthService {
@@ -13,16 +16,66 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private usersService: UsersService,
     private jwtService: JwtService,
+    private smsService: SmsService,
     private readonly configService: ConfigService,
   ) {}
 
-  async validateUser(phone: string, password: string): Promise<any> {
-    const user = await this.usersService.findOne(phone);
-    const passwordIsMatch = user?.password ? await bcrypt.compare(password, user.password) : false;
-    if (user && passwordIsMatch) {
-      return user;
+  async requestRegistrationCode(phone: string) {
+    const existingUser = await this.usersService.findOne(phone);
+    if (existingUser) {
+      throw new ConflictException('Пользователь с таким номером телефона уже существует.');
     }
-    throw new UnauthorizedException('Неправильный номер телефона или пароль');
+
+    await this.generateAndSendCode(phone, SmsVerificationType.REGISTRATION);
+
+    return {
+      message: 'Код для регистрации отправлен.',
+    };
+  }
+
+  async requestLoginCode(phone: string) {
+    const existingUser = await this.usersService.findOne(phone);
+    if (!existingUser) {
+      throw new BadRequestException('Пользователь с таким номером не найден.');
+    }
+
+    await this.generateAndSendCode(phone, SmsVerificationType.LOGIN);
+
+    return {
+      message: 'Код для входа отправлен.',
+    };
+  }
+
+  async verifySmsCodeAndLogin(dto: VerifySmsCodeDto) {
+    const { phone, code, type } = dto;
+
+    const verification = await this.prisma.smsVerification.findUnique({
+      where: { phone_type: { phone, type } },
+    });
+
+    if (verification) {
+      await this.prisma.smsVerification.delete({ where: { id: verification.id } });
+    }
+
+    if (!verification || verification.code !== code || new Date() > verification.expiresAt) {
+      throw new BadRequestException('Неверный код или срок его действия истёк.');
+    }
+
+    let user = await this.usersService.findOne(phone);
+
+    if (type === SmsVerificationType.REGISTRATION && !user) {
+      const baseName = `user_${phone.slice(-4)}${Date.now().toString().slice(-4)}`;
+      const slug = `u-${nanoid(10)}`;
+      user = await this.prisma.user.create({
+        data: { phone, name: baseName, slug },
+      });
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('Не удалось найти или создать пользователя.');
+    }
+
+    return this.login(user as IUser);
   }
 
   async login(user: IUser) {
@@ -40,57 +93,6 @@ export class AuthService {
         hashedRefreshToken: null,
       },
     });
-  }
-
-  async register(dto: RegisterDto) {
-    const existingUser = await this.usersService.findOne(dto.phone);
-    if (existingUser) {
-      throw new ConflictException('Пользователь с таким номером телефона уже существует');
-    }
-
-    const existingUserByName = await this.prisma.user.findUnique({
-      where: { name: dto.name },
-    });
-    if (existingUserByName) {
-      throw new ConflictException('Пользователь с таким именем уже существует');
-    }
-
-    const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash(dto.password, salt);
-
-    const timestamp = Date.now().toString().slice(-8);
-    const randomPart = Math.random().toString().substring(2, 8);
-    const uniqueSlug = (randomPart + timestamp).slice(0, 10);
-
-    const user = await this.prisma.user.create({
-      data: {
-        phone: dto.phone,
-        name: dto.name,
-        password: hashedPassword,
-        slug: uniqueSlug,
-      },
-    });
-    return this.login(user as IUser);
-  }
-
-  async refreshTokens(userId: number, refreshToken: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || !user.hashedRefreshToken) {
-      throw new ForbiddenException('Доступ запрещен. Пользователь не найден или токен недействителен.');
-    }
-
-    const refreshTokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken);
-
-    if (!refreshTokenMatches) {
-      throw new ForbiddenException('Доступ запрещен. Неверный токен.');
-    }
-
-    const tokens = await this.getTokens(user.id, user.phone);
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
-    return tokens;
   }
 
   private async updateRefreshToken(userId: number, refreshToken: string) {
@@ -129,6 +131,36 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  async refreshTokens(userId: number, refreshToken: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user || !user.hashedRefreshToken) {
+      throw new ForbiddenException('Доступ запрещен.');
+    }
+    const refreshTokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken);
+
+    if (!refreshTokenMatches) {
+      throw new ForbiddenException('Доступ запрещен.');
+    }
+    const tokens = await this.getTokens(user.id, user.phone);
+    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    return tokens;
+  }
+
+  private async generateAndSendCode(phone: string, type: SmsVerificationType) {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 минуты
+
+    await this.prisma.smsVerification.upsert({
+      where: { phone_type: { phone, type } },
+      update: { code, expiresAt },
+      create: { phone, code, expiresAt, type },
+    });
+    // await this.smsService.sendVerificationCode(phone, code);
+    console.log(`[SMS Service Mock] Code for ${phone} (${type}): ${code}`);
   }
 
   // // Валидация initData от Telegram

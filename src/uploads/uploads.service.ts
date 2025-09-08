@@ -81,11 +81,11 @@ export class UploadsService {
     }
   }
 
-  public async getMediaById(entityType: EntityType, entityId: number) {
+  public async getMediaById(entityType: EntityType, entityId: number | number[]) {
     const media = await this.prisma.media.findMany({
       where: {
-        entityType: entityType,
-        entityId: entityId,
+        entityType,
+        entityId: Array.isArray(entityId) ? { in: entityId } : entityId,
       },
       select: {
         id: true,
