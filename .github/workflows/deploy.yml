@@ -57,5 +57,6 @@ jobs:
             npm install --production
             npx prisma generate
             npx prisma migrate deploy
-            pm2 restart api || pm2 start --name "api" dist/src/main.js
+            npx prisma db seed      # 2. Запускаем сиды
+            pm2 startOrRestart --name "api" dist/src/main.js
           EOF
