@@ -5,6 +5,7 @@ import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { VerifySmsCodeDto } from './dto/verify-sms-code.dto';
 import { RequestCodeDto } from './dto/request-code.dto';
+import { TelegramLoginDto } from './dto/telegram-login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -40,5 +41,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async refreshTokens(@GetUser('sub') userId: number, @GetUser('refreshToken') refreshToken: string) {
     return await this.authService.refreshTokens(userId, refreshToken);
+  }
+
+  @Post('telegram')
+  @HttpCode(HttpStatus.OK)
+  async loginWithTelegram(@Body() dto: TelegramLoginDto) {
+    console.log('Telegram login attempt with DTO:', dto);
+    return this.authService.loginWithTelegram(dto);
   }
 }
