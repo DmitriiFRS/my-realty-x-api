@@ -11,7 +11,6 @@ import { SmsService } from 'src/sms/sms.service';
 import { nanoid } from 'nanoid';
 import { VerifySmsCodeDto } from './dto/verify-sms-code.dto';
 import { TelegramLoginDto } from './dto/telegram-login.dto';
-import { FindOrCreateTgDto } from 'src/users/dto/findOrCreateTg.dto';
 
 @Injectable()
 export class AuthService {
@@ -50,7 +49,7 @@ export class AuthService {
   }
 
   async verifySmsCodeAndLogin(dto: VerifySmsCodeDto) {
-    const { phone, code, type } = dto;
+    const { phone, code, type, initData } = dto;
 
     const verification = await this.prisma.smsVerification.findUnique({
       where: { phone_type: { phone, type } },
@@ -64,19 +63,28 @@ export class AuthService {
       throw new BadRequestException('Неверный код или срок его действия истёк.');
     }
 
-    let user = await this.usersService.findOne(phone);
+    if (initData) {
+      const userDataFromTelegram = this.validateTelegramInitData(initData);
+      const telegramUser = JSON.parse(userDataFromTelegram.user);
+      const telegramId = telegramUser.id.toString();
+      const name = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') || telegramUser.username;
+      const slug = `u-${nanoid(10)}`;
 
+      const user = await this.prisma.user.upsert({
+        where: { phone },
+        update: { telegramId },
+        create: { phone, name, slug, telegramId },
+      });
+      return this.login(user as IUser);
+    }
+    let user = await this.usersService.findOne(phone);
     if (type === SmsVerificationType.REGISTRATION && !user) {
       const baseName = `user_${phone.slice(-4)}${Date.now().toString().slice(-4)}`;
       const slug = `u-${nanoid(10)}`;
-      user = await this.prisma.user.create({
-        data: { phone, name: baseName, slug },
-      });
+      user = await this.prisma.user.create({ data: { phone, name: baseName, slug } });
     }
 
-    if (!user) {
-      throw new UnauthorizedException('Не удалось найти или создать пользователя.');
-    }
+    if (!user) throw new UnauthorizedException('Не удалось найти или создать пользователя.');
 
     return this.login(user as IUser);
   }
@@ -153,7 +161,7 @@ export class AuthService {
     return tokens;
   }
 
-  private async generateAndSendCode(phone: string, type: SmsVerificationType) {
+  private async generateAndSendCode(phone: string, type: SmsVerificationType): Promise<{ code: string }> {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 2 минуты
 
@@ -164,23 +172,32 @@ export class AuthService {
     });
     // await this.smsService.sendVerificationCode(phone, code);
     console.log(`[SMS Service Mock] Code for ${phone} (${type}): ${code}`);
+    return { code };
   }
 
   async loginWithTelegram(dto: TelegramLoginDto) {
     const userDataFromTelegram = this.validateTelegramInitData(dto.initData);
     const telegramUser = JSON.parse(userDataFromTelegram.user);
-    const name = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') || telegramUser.username;
-    const userPayload: FindOrCreateTgDto = {
-      name,
-      telegramId: telegramUser.id.toString(),
-      phone: dto.phone,
-      username: telegramUser.username,
-      firstName: telegramUser.first_name,
-      lastName: telegramUser.last_name,
-      photoUrl: telegramUser.photo_url,
+    const telegramId = telegramUser.id.toString();
+    const userByTg = await this.prisma.user.findUnique({ where: { telegramId } });
+
+    if (userByTg) {
+      if (userByTg.phone !== dto.phone) {
+        throw new BadRequestException('Этот Telegram-аккаунт уже привязан к другому номеру телефона.');
+      }
+      return this.login(userByTg as IUser);
+      // error userByTg.phone !== dto.phone
+    }
+    const userByPhone = await this.prisma.user.findUnique({ where: { phone: dto.phone } });
+    if (userByPhone && userByPhone.telegramId) {
+      throw new ConflictException('Номер телефона уже используется другим Telegram-аккаунтом.');
+    }
+    const codeData = await this.generateAndSendCode(dto.phone, SmsVerificationType.LOGIN);
+    return {
+      message: 'Требуется верификация по СМС.',
+      code: 'PHONE_NEEDS_VERIFICATION',
+      verificationCode: codeData.code,
     };
-    const user = await this.usersService.findOrCreateByTelegramId(userPayload);
-    return this.login(user as IUser);
   }
 
   private validateTelegramInitData(initData: string): Record<string, string> {
