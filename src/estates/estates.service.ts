@@ -211,6 +211,59 @@ export class EstatesService {
     };
   }
 
+  async getFavoriteEstates(ids: number[], page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+    const take = limit;
+    const estates = await this.prisma.estate.findMany({
+      where: { id: { in: ids }, status: { status: 'VERIFIED' } },
+      include: {
+        city: { select: { id: true, name: true, slug: true } },
+        district: { select: { id: true, name: true, slug: true } },
+        estateType: { select: { id: true, name: true, slug: true } },
+        room: { select: { id: true, name: true, slug: true } },
+        features: { select: { id: true, name: true, slug: true } },
+        EstatePrimaryMedia: true,
+      },
+      skip,
+      take,
+    });
+    if (!estates || estates.length === 0) {
+      throw new NotFoundException('Нет избранных объявлений');
+    }
+    const total = await this.prisma.estate.count({
+      where: { id: { in: ids }, status: { status: 'VERIFIED' } },
+    });
+
+    const estateIds = estates.map((estate) => estate.id);
+    const media = await this.prisma.media.findMany({
+      where: {
+        entityType: 'estate',
+        entityId: { in: estateIds },
+      },
+    });
+    const estatesWithMedia = estates.map((estate) => ({
+      ...estate,
+      media: media.filter((m) => m.entityId === estate.id),
+    }));
+    return {
+      data: estatesWithMedia,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getEstatesByUserId(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    return this.getEstates(1, 20, { userId: user.id }, { select: getEstatesSelect });
+  }
+
   async adminUpdateEstate(
     userId: number,
     estateId: number,
@@ -423,7 +476,6 @@ export class EstatesService {
       ...estate,
       media: media.filter((m) => m.entityId === estate.id && m.id !== estate.primaryMediaId),
     }));
-
     return {
       data: estatesWithMedia,
       meta: {

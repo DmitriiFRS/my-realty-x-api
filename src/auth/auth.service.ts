@@ -41,10 +41,11 @@ export class AuthService {
       throw new BadRequestException('Пользователь с таким номером не найден.');
     }
 
-    await this.generateAndSendCode(phone, SmsVerificationType.LOGIN);
+    const data = await this.generateAndSendCode(phone, SmsVerificationType.LOGIN);
 
     return {
       message: 'Код для входа отправлен.',
+      code: data.code,
     };
   }
 
@@ -145,6 +146,7 @@ export class AuthService {
   }
 
   async refreshTokens(userId: number, refreshToken: string) {
+    console.log('Refreshing tokens for userId:', userId);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -180,7 +182,6 @@ export class AuthService {
     const telegramUser = JSON.parse(userDataFromTelegram.user);
     const telegramId = telegramUser.id.toString();
     const userByTg = await this.prisma.user.findUnique({ where: { telegramId } });
-    console.log('User found by Telegram ID:', userByTg);
     if (userByTg) {
       if (userByTg.phone !== dto.phone) {
         throw new BadRequestException('Этот Telegram-аккаунт уже привязан к другому номеру телефона.');

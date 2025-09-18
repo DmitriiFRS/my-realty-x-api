@@ -21,6 +21,7 @@ import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { UpdateEstateDto } from './dto/update-estate.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
+import { GetFavoritesDto } from './dto/get-favorites.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
@@ -54,6 +55,18 @@ export class EstatesController {
   @Get('estate/slug/:slug')
   async getEstateBySlug(@Param('slug') slug: string) {
     return this.estatesService.getEstateBySlug(slug);
+  }
+
+  @Get('favorites')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async getFavoriteEstates(@Query() query: GetFavoritesDto) {
+    return this.estatesService.getFavoriteEstates(query.ids, query.page, query.limit);
+  }
+
+  @Get('my-estates')
+  @UseGuards(JwtAuthGuard)
+  async getMyEstates(@GetUser('id') userId: number) {
+    return await this.estatesService.getEstatesByUserId(userId);
   }
 
   @Get('filtered')
@@ -122,7 +135,7 @@ export class EstatesController {
   }
 
   @Post('create')
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -141,11 +154,11 @@ export class EstatesController {
     ),
   )
   async createEstate(
-    // @GetUser('id') userId: number,
+    @GetUser('id') userId: number,
     @Body() dto: CreateEstateDto,
     @UploadedFiles() files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
   ) {
-    return this.estatesService.createEstate(5, dto, files);
+    return this.estatesService.createEstate(userId, dto, files);
   }
 
   @Delete('/admin-delete/:id')

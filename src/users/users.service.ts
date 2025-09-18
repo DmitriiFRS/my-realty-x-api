@@ -28,6 +28,42 @@ export class UsersService {
     return user;
   }
 
+  async getMe(userId: number) {
+    console.log('getMe called with userId:', userId);
+    if (!userId) throw new BadRequestException('userId is required');
+    const totalViewsAggregation = await this.prisma.estateView.aggregate({
+      _sum: {
+        count: true,
+      },
+      where: {
+        estate: {
+          userId: userId,
+        },
+      },
+    });
+    const totalEstates = await this.prisma.estate.count({
+      where: { userId: userId },
+    });
+    const totalViews = totalViewsAggregation._sum.count || 0;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        estates: {
+          select: {
+            id: true,
+            views: true,
+          },
+        },
+      },
+    });
+    if (!user) throw new BadRequestException('User not found');
+    return {
+      ...user,
+      totalViews: totalViews,
+      totalEstates: totalEstates,
+    };
+  }
+
   async findOrCreateByTelegramId(dto: FindOrCreateTgDto) {
     const { telegramId, phone, photoUrl } = dto;
 
