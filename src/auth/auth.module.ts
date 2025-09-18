@@ -9,7 +9,6 @@ import { PrismaService } from 'src/prisma.service';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { SmsService } from 'src/sms/sms.service';
-import { TestController } from './test.controller';
 
 @Module({
   imports: [
@@ -25,7 +24,7 @@ import { TestController } from './test.controller';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, TestController],
+  controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtRefreshStrategy, SmsService, PrismaService],
   exports: [AuthService, PrismaService, JwtModule],
 })
