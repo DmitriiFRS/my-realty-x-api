@@ -108,6 +108,7 @@ export class AuthService {
   }
 
   private async updateRefreshToken(userId: number, refreshToken: string) {
+    console.log(`Updating refresh token for userId: ${userId}`);
     const salt = await bcrypt.genSalt();
     const hashedToken = await bcrypt.hash(refreshToken, salt);
     await this.prisma.user.update({
@@ -117,6 +118,7 @@ export class AuthService {
   }
 
   private async getTokens(userId: number, phone: string) {
+    console.log(`Generating tokens for userId: ${userId}, phone: ${phone}`);
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(
         {
