@@ -10,28 +10,34 @@ async function bootstrap() {
   };
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix('api');
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'https://admin-realty-x.kelyanmedia.com',
-    'https://realty-x.kelyanmedia.com',
-    'https://done-theaters-insulin-tropical.trycloudflare.com',
-  ];
+  // const allowedOrigins = [
+  //   'http://localhost:3000',
+  //   'http://localhost:3001',
+  //   'https://admin-realty-x.kelyanmedia.com',
+  //   'https://realty-x.kelyanmedia.com',
+  //   'https://done-theaters-insulin-tropical.trycloudflare.com',
+  // ];
 
   app.enableCors({
-    origin: (origin, callback) => {
-      console.log('CORS check for origin:', origin);
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Домен не разрешен политикой CORS'));
-      }
-    },
+    origin: true, // Разрешает ЛЮБОЙ источник
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
   });
+
+  // app.enableCors({
+  //   origin: (origin, callback) => {
+  //     console.log('CORS check for origin:', origin);
+  //     if (!origin || allowedOrigins.includes(origin)) {
+  //       callback(null, true);
+  //     } else {
+  //       callback(new Error('Домен не разрешен политикой CORS'));
+  //     }
+  //   },
+  //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  //   credentials: true,
+  //   preflightContinue: false,
+  //   optionsSuccessStatus: 204,
+  // });
 
   const uploadsPath = join(__dirname, '..', '..', 'uploads');
   app.useGlobalPipes(
