@@ -15,6 +15,7 @@ async function bootstrap() {
     'http://localhost:3001',
     'https://admin-realty-x.kelyanmedia.com',
     'https://realty-x.kelyanmedia.com',
+    'https://done-theaters-insulin-tropical.trycloudflare.com/',
   ];
 
   app.enableCors({
