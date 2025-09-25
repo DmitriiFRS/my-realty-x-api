@@ -46,7 +46,6 @@ export class AuthController {
   @Post('telegram')
   @HttpCode(HttpStatus.OK)
   async loginWithTelegram(@Body() dto: TelegramLoginDto) {
-    console.log('Telegram login attempt with DTO:', dto);
     return this.authService.loginWithTelegram(dto);
   }
 }

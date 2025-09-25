@@ -66,6 +66,7 @@ export class EstatesController {
   @Get('my-estates')
   @UseGuards(JwtAuthGuard)
   async getMyEstates(@GetUser('id') userId: number) {
+    console.log('Fetching estates for userId:', userId);
     return await this.estatesService.getEstatesByUserId(userId);
   }
 
@@ -76,7 +77,6 @@ export class EstatesController {
     }),
   )
   async getFilteredEstates(@Query() query: GetFilteredEstatesDto) {
-    console.log(query);
     return this.estatesService.getFilteredEstates(query);
   }
 
