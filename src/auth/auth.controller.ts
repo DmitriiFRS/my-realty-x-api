@@ -1,4 +1,4 @@
-import { Controller, HttpCode, HttpStatus, Post, UseGuards, Body } from '@nestjs/common';
+import { Controller, HttpCode, HttpStatus, Post, UseGuards, Body, ForbiddenException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -39,7 +39,17 @@ export class AuthController {
   @Post('refresh')
   @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
-  async refreshTokens(@GetUser('sub') userId: number, @GetUser('refreshToken') refreshToken: string) {
+  async refreshTokens(
+    @GetUser() userFromToken: any, // Временно получаем весь объект user
+    @Body('refreshToken') refreshToken: string,
+  ) {
+    const userId = userFromToken?.sub; // Вручную извлекаем ID (поле sub)
+
+    if (!userId) {
+      // Если ID не найден, выбрасываем ошибку
+      throw new ForbiddenException('Could not identify user from token payload.');
+    }
+
     return await this.authService.refreshTokens(userId, refreshToken);
   }
 

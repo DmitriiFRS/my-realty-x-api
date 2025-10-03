@@ -7,7 +7,6 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from 'src/prisma.service';
 import { SmsVerificationType } from '@prisma/client';
-import { SmsService } from 'src/sms/sms.service';
 import { nanoid } from 'nanoid';
 import { VerifySmsCodeDto } from './dto/verify-sms-code.dto';
 import { TelegramLoginDto } from './dto/telegram-login.dto';
@@ -18,7 +17,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private usersService: UsersService,
     private jwtService: JwtService,
-    private smsService: SmsService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -146,6 +144,9 @@ export class AuthService {
   }
 
   async refreshTokens(userId: number, refreshToken: string) {
+    // if (!refreshToken) {
+    //   throw new ForbiddenException('Доступ запрещен.');
+    // }
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });

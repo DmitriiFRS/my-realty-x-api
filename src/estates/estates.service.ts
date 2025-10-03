@@ -54,11 +54,15 @@ export class EstatesService {
         room: {
           select: { id: true, name: true, slug: true },
         },
+        user: {
+          select: { id: true, name: true, phone: true, avatarUrl: true },
+        },
       },
     });
 
     if (!estate) return new NotFoundException('Объявление не найдено');
     const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estate.id);
+    console.log(estate);
     return { data: { ...estate, media } };
   }
 
