@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { FindOrCreateTgDto } from './dto/findOrCreateTg.dto';
 import { buildUserNameFromTg } from 'src/helpers/buildUserNameFromTg';
 import { Prisma, User } from '@prisma/client';
 import { nanoid } from 'nanoid';
+import { UpdateReminderDto } from './dto/updateReminder.dto';
+import { CreateReminderDto } from './dto/createReminder.dto';
 
 @Injectable()
 export class UsersService {
@@ -74,6 +76,60 @@ export class UsersService {
         userId: userId,
       },
     });
+  }
+
+  async deleteReminder(userId: number, reminderId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('User not found');
+    const reminder = await this.prisma.estate.findUnique({
+      where: { id: reminderId },
+    });
+    if (!reminder) throw new BadRequestException('Reminder not found');
+    if (reminder.userId !== userId) throw new BadRequestException('You can delete only your own reminders');
+    await this.prisma.estate.delete({
+      where: { id: reminderId },
+    });
+    return { success: true };
+  }
+
+  async createReminder(userId: number, dto: CreateReminderDto) {
+    const newReminder = await this.prisma.reminder.create({
+      data: {
+        text: dto.text,
+        remindAt: dto.remindAt,
+        userId: userId,
+      },
+    });
+    return newReminder;
+  }
+
+  async updateReminder(userId: number, reminderId: number, dto: UpdateReminderDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('User not found');
+
+    const reminder = await this.prisma.reminder.findFirst({
+      where: {
+        id: reminderId,
+        userId: userId,
+      },
+    });
+    if (!reminder) {
+      throw new NotFoundException('Напоминание не найдено');
+    }
+    const updatedReminder = await this.prisma.reminder.update({
+      where: {
+        id: reminderId,
+      },
+      data: {
+        text: dto.text,
+        remindAt: dto.remindAt,
+      },
+    });
+    return updatedReminder;
   }
 
   async findOrCreateByTelegramId(dto: FindOrCreateTgDto) {
