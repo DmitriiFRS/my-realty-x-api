@@ -13,6 +13,7 @@ import { CitiesModule } from './cities/cities.module';
 import { CurrencyTypesModule } from './currency-types/currency-types.module';
 import { AuthModule } from './auth/auth.module';
 import { EstateFeaturesModule } from './estate-features/estate-features.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { EstateFeaturesModule } from './estate-features/estate-features.module';
     CitiesModule,
     CurrencyTypesModule,
     EstateFeaturesModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

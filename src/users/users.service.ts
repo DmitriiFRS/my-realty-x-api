@@ -63,6 +63,19 @@ export class UsersService {
     };
   }
 
+  async getReminders(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('User not found');
+
+    const reminders = await this.prisma.estate.findMany({
+      where: {
+        userId: userId,
+      },
+    });
+  }
+
   async findOrCreateByTelegramId(dto: FindOrCreateTgDto) {
     const { telegramId, phone, photoUrl } = dto;
 

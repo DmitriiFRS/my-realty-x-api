@@ -268,6 +268,22 @@ export class EstatesService {
     return this.getEstates(1, 20, { userId: user.id }, { select: getEstatesSelect });
   }
 
+  async getFreeEstates(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    return this.getEstates(1, 20, { userId: user.id, availability: 'AVAILABLE' }, { select: getEstatesSelect });
+  }
+
+  async getSoldEstates(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    return this.getEstates(1, 20, { userId: user.id, availability: 'SOLD' }, { select: getEstatesSelect });
+  }
+
   async adminUpdateEstate(
     userId: number,
     estateId: number,
@@ -300,6 +316,31 @@ export class EstatesService {
     });
     if (!user) throw new BadRequestException('Пользователь не найден');
     return this.deleteEstate(estateId);
+  }
+
+  async getCrmEstateById(userId: number, estateId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    const estate = await this.prisma.estate.findFirst({
+      where: { id: estateId, userId: user.id },
+      select: getEstatesSelect,
+    });
+    if (!estate) throw new BadRequestException('Объявление не найдено');
+    const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estateId);
+    const document = await this.uploadsService.getMediaById(EntityType.ESTATE_PDF, estateId);
+    const filteredMedia = media.filter((m) => m.id !== estate.EstatePrimaryMedia?.id);
+
+    const estateWithMedia = {
+      ...estate,
+      media: filteredMedia,
+      document: document,
+    };
+
+    return {
+      data: estateWithMedia,
+    };
   }
 
   /* =================== PRIVATE ================== */

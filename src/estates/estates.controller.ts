@@ -164,4 +164,29 @@ export class EstatesController {
   async deleteEstateByAdmin(@Param('id') id: number) {
     return this.estatesService.adminDeleteEstate(5, id);
   }
+  /* ============================Realtor crm================================= */
+
+  @Get('crm/my-estates')
+  @UseGuards(JwtAuthGuard)
+  async getRealtorEstates(@GetUser('id') userId: number) {
+    return this.estatesService.getEstatesByUserId(userId);
+  }
+
+  @Get('crm/estates/free')
+  @UseGuards(JwtAuthGuard)
+  async getFreeEstates(@GetUser('id') userId: number) {
+    return this.estatesService.getFreeEstates(userId);
+  }
+
+  @Get('crm/estates/sold')
+  @UseGuards(JwtAuthGuard)
+  async getSoldEstates(@GetUser('id') userId: number) {
+    return this.estatesService.getSoldEstates(userId);
+  }
+
+  @Get('crm/estates/estate/:id')
+  @UseGuards(JwtAuthGuard)
+  async getRealtorEstateById(@GetUser('id') userId: number, @Param('id') id: number) {
+    return this.estatesService.getCrmEstateById(userId, id);
+  }
 }

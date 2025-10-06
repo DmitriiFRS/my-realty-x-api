@@ -28,6 +28,8 @@ model User {
   sender Complaints[]
   translations UserTranslation[]
   role Role @relation(fields: [roleId], references: [id])
+  transactions Transaction[]
+  reminders Reminder[]
 
   @@map("users")
 }
@@ -47,6 +49,9 @@ model Estate {
   currencyTypeId Int
   primaryMediaId Int? @unique
   primaryImageUrl String?
+  availability EstateAvailabilityStatus @default(AVAILABLE)
+  deposit BigInt?
+  leaseTermUnit String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -62,6 +67,7 @@ model Estate {
   features EstateFeature[]
   EstatePrimaryMedia Media? @relation("estatePrimaryMedia", fields: [primaryMediaId], references: [id], onDelete: SetNull)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
   status EstateStatus?
   views EstateView?
   translations EstateTranslation[]
@@ -90,6 +96,21 @@ model EstateView {
   estate    Estate   @relation(fields: [estateId], references: [id], onDelete: Cascade)
 
   @@map("estate_views")
+}
+
+model Transaction {
+  id Int @default (autoincrement()) @id
+  userId Int
+  estateId Int
+  amount BigInt
+  dealDate DateTime
+  clientName String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  estate Estate @relation(fields: [estateId], references: [id], onDelete: Cascade)
+  @@map("transactions")
 }
 
 model Room {
@@ -230,6 +251,19 @@ model Role {
   translations RoleTranslation[]
 
   @@map("roles")
+}
+
+model Reminder {
+  id Int @default(autoincrement()) @id
+  text String @db.Text
+  remindAt DateTime
+  userId Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reminders")
 }
 
 model Media {
@@ -381,4 +415,10 @@ enum EstateStatusEnum {
   PENDING @map("pending")
   VERIFIED @map("verified")
   REJECTED @map("rejected")
+}
+
+enum EstateAvailabilityStatus {
+  AVAILABLE @map("available")
+  ARCHIVED @map("archived")
+  SOLD @map("sold")
 }

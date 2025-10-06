@@ -19,4 +19,10 @@ export class UsersController {
   async authByTelegram(@Body() dto: FindOrCreateTgDto) {
     return this.usersService.findOrCreateByTelegramId(dto);
   }
+
+  @Get('crm/reminders')
+  @UseGuards(JwtAuthGuard)
+  async getEstatesWithReminders(@GetUser('id') userId: number) {
+    return this.usersService.getReminders(userId);
+  }
 }

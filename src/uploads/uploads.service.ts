@@ -17,6 +17,9 @@ export class UploadsService {
         return this.prisma.estate.findUnique({ where: { id } });
       case EntityType.AVATAR:
         return this.prisma.user.findUnique({ where: { id } });
+      case EntityType.ESTATE_PDF:
+        return this.prisma.estate.findUnique({ where: { id } });
+      case EntityType.ADVERTISEMENT:
       default:
         throw new BadRequestException(`Неподдерживаемый тип сущности: ${type}`);
     }
