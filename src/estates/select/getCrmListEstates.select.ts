@@ -1,21 +1,12 @@
-export const getCrmEstateSelect = {
+export const getCrmListEstatesSelect = {
   id: true,
   slug: true,
   description: true,
   area: true,
   price: true,
-  deposit: true,
-  leaseTermUnit: true,
   primaryImageUrl: true,
   createdAt: true,
   updatedAt: true,
-  user: {
-    select: {
-      id: true,
-      name: true,
-      phone: true,
-    },
-  },
   status: {
     select: {
       id: true,
@@ -62,23 +53,6 @@ export const getCrmEstateSelect = {
       id: true,
       name: true,
       slug: true,
-    },
-  },
-  features: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-    },
-  },
-  EstatePrimaryMedia: {
-    select: {
-      id: true,
-    },
-  },
-  leaseAgreement: {
-    select: {
-      id: true,
     },
   },
 };

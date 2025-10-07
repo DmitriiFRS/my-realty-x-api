@@ -22,6 +22,7 @@ import { UpdateEstateDto } from './dto/update-estate.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
 import { GetFavoritesDto } from './dto/get-favorites.dto';
+import { CreateLeaseAgreementDto } from './dto/create-lease-agreement.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
@@ -125,7 +126,7 @@ export class EstatesController {
     ),
   )
   async editEstateByUser(
-    @GetUser('sub') userId: number,
+    @GetUser('id') userId: number,
     @Param('id') id: number,
     @Body() dto: UpdateEstateDto,
     @UploadedFiles() files: { primaryImage?: Express.Multer.File[]; images?: Express.Multer.File[] },
@@ -184,9 +185,58 @@ export class EstatesController {
     return this.estatesService.getSoldEstates(userId);
   }
 
-  @Get('crm/estates/estate/:id')
+  @Get('crm/estates/estate/:slug')
   @UseGuards(JwtAuthGuard)
-  async getRealtorEstateById(@GetUser('id') userId: number, @Param('id') id: number) {
-    return this.estatesService.getCrmEstateById(userId, id);
+  async getCrmEstateBySlug(@GetUser('id') userId: number, @Param('slug') slug: number) {
+    console.log('slug', slug);
+    return this.estatesService.getCrmEstateBySlug(userId, slug);
+  }
+
+  @Post('lease/create')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'photos', maxCount: 10 }, // для "Фотографии в день сдачи"
+      { name: 'document', maxCount: 1 }, // для "Документы" (1 файл)
+    ]),
+  )
+  async create(
+    @GetUser('id') userId: number,
+    @Body() dto: CreateLeaseAgreementDto,
+    @UploadedFiles() files: { photos?: Express.Multer.File[]; document?: Express.Multer.File[] },
+  ) {
+    return this.estatesService.createLeaseAgreement(userId, dto, files);
+  }
+  @Put('crm/update/:id')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'primaryImage', maxCount: 1 },
+        { name: 'images', maxCount: 10 },
+      ],
+      {
+        limits: { fileSize: 5 * 1024 * 1024 },
+        fileFilter: (req, file, cb) => {
+          if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
+            return cb(new Error('Только изображения'), false);
+          }
+          cb(null, true);
+        },
+      },
+    ),
+  )
+  async updateEstate(
+    @GetUser('id') userId: number,
+    @Param('id') id: number,
+    @Body() dto: UpdateEstateDto,
+    @UploadedFiles() files: { primaryImage?: Express.Multer.File[]; images?: Express.Multer.File[] },
+  ) {
+    return this.estatesService.userUpdateEstate(userId, id, dto, files);
+  }
+  @Delete('crm/delete/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteEstateByUser(@GetUser('id') userId: number, @Param('id') id: number) {
+    return this.estatesService.adminDeleteEstate(userId, id);
   }
 }

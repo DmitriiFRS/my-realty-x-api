@@ -47,11 +47,14 @@ model Estate {
   cityId Int?
   districtId Int
   currencyTypeId Int
+
   primaryMediaId Int? @unique
   primaryImageUrl String?
   availability EstateAvailabilityStatus @default(AVAILABLE)
   deposit BigInt?
   leaseTermUnit String?
+  isExclusive Boolean @default(false)
+  leaseEndDate DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,9 +73,30 @@ model Estate {
   transactions Transaction[]
   status EstateStatus?
   views EstateView?
+  leaseAgreement LeaseAgreement?
   translations EstateTranslation[]
 
   @@map("estates")
+}
+
+model LeaseAgreement {
+  id Int @default(autoincrement()) @id
+  estateId Int @unique
+  currencyTypeId Int
+  tenantName String
+  tenantPhone String
+  rentAmount BigInt
+  depositAmount BigInt
+  startDate DateTime @default(now())
+  endDate DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estate Estate @relation(fields: [estateId], references: [id], onDelete: Cascade)
+  currencyType CurrencyType @relation(fields: [currencyTypeId], references: [id], onDelete: Cascade)
+
+  @@map("lease_agreements")
 }
 
 model EstateStatus {
@@ -165,6 +189,7 @@ model CurrencyType {
   updatedAt DateTime @updatedAt
 
   estates Estate[]
+  leaseAgreements LeaseAgreement[]
 
   @@map("currency_types")
 }

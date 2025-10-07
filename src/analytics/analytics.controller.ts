@@ -20,7 +20,14 @@ export class AnalyticsController {
   }
 
   @Get('chart')
+  @UseGuards(JwtAuthGuard)
   getChartData(@GetUser('id') userId: number) {
     return this.analyticsService.getChartData(userId);
+  }
+
+  @Get('exclusives')
+  @UseGuards(JwtAuthGuard)
+  getExclusiveAnalytics(@GetUser('id') userId: number) {
+    return this.analyticsService.getExclusiveAnalytics(userId);
   }
 }

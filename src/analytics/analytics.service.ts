@@ -52,6 +52,13 @@ export class AnalyticsService {
       orderBy: {
         dealDate: 'desc',
       },
+      include: {
+        estate: {
+          select: {
+            slug: true,
+          },
+        },
+      },
     });
     const result: {
       currentMonth: typeof transactions;
@@ -130,6 +137,79 @@ export class AnalyticsService {
     return {
       totalLast30Days: totalLast30Days.toString(),
       chartData,
+    };
+  }
+
+  async getExclusiveAnalytics(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+
+    const totalEstates = await this.prisma.estate.findMany({
+      where: { userId: userId },
+      select: { id: true, isExclusive: true },
+    });
+    let exclusiveCount = 0;
+    let regularCount = 0;
+    for (const estate of totalEstates) {
+      if (estate.isExclusive) {
+        exclusiveCount++;
+      } else {
+        regularCount++;
+      }
+    }
+    const exclusivePercentage = totalEstates.length > 0 ? (exclusiveCount / totalEstates.length) * 100 : 0;
+    const regularPercentage = totalEstates.length > 0 ? (regularCount / totalEstates.length) * 100 : 0;
+    return {
+      exclusive: {
+        count: exclusiveCount,
+        percentage: parseFloat(exclusivePercentage.toFixed(1)),
+      },
+      regular: {
+        count: regularCount,
+        percentage: parseFloat(regularPercentage.toFixed(1)),
+      },
+      total: totalEstates.length,
+    };
+  }
+
+  async getEstateTypesAnalytics(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+
+    const totalEstates = await this.prisma.estate.findMany({
+      where: { userId: userId },
+      select: { id: true, isExclusive: true, estateType: true },
+    });
+    let apartmentCount = 0;
+    let houseCount = 0;
+    let commercialCount = 0;
+    let dachaCount = 0;
+    for (const estate of totalEstates) {
+      switch (estate.estateType.slug) {
+        case 'apartment':
+          apartmentCount++;
+          break;
+        case 'house':
+          houseCount++;
+          break;
+        case 'commercial':
+          commercialCount++;
+          break;
+        case 'dacha':
+          dachaCount++;
+          break;
+      }
+    }
+    return {
+      apartmentEstates: apartmentCount,
+      houseEstates: houseCount,
+      commercialEstates: commercialCount,
+      dachaEstates: dachaCount,
+      totalEstates: totalEstates.length,
     };
   }
 }

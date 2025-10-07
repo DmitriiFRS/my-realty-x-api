@@ -17,9 +17,10 @@ export class UploadsService {
         return this.prisma.estate.findUnique({ where: { id } });
       case EntityType.AVATAR:
         return this.prisma.user.findUnique({ where: { id } });
-      case EntityType.ESTATE_PDF:
+      case EntityType.LEASE_PDF:
         return this.prisma.estate.findUnique({ where: { id } });
-      case EntityType.ADVERTISEMENT:
+      case EntityType.LEASE_PHOTOS:
+        return this.prisma.estate.findUnique({ where: { id } });
       default:
         throw new BadRequestException(`Неподдерживаемый тип сущности: ${type}`);
     }
@@ -84,7 +85,7 @@ export class UploadsService {
     }
   }
 
-  public async getMediaById(entityType: EntityType, entityId: number | number[]) {
+  public async getMediaById(entityType: EntityType, entityId: number | number[] | undefined) {
     const media = await this.prisma.media.findMany({
       where: {
         entityType,

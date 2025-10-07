@@ -7,6 +7,9 @@ import { Prisma } from '@prisma/client';
 import { getEstatesSelect } from './select/getEstates.select';
 import { UpdateEstateDto } from './dto/update-estate.dto';
 import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
+import { getCrmEstateSelect } from './select/getCrmEstate.select';
+import { CreateLeaseAgreementDto } from './dto/create-lease-agreement.dto';
+import { getCrmListEstatesSelect } from './select/getCrmListEstates.select';
 
 @Injectable()
 export class EstatesService {
@@ -273,7 +276,7 @@ export class EstatesService {
       where: { id: userId },
     });
     if (!user) throw new BadRequestException('Пользователь не найден');
-    return this.getEstates(1, 20, { userId: user.id, availability: 'AVAILABLE' }, { select: getEstatesSelect });
+    return this.getEstates(1, 20, { userId: user.id, availability: 'AVAILABLE' }, { select: getCrmListEstatesSelect });
   }
 
   async getSoldEstates(userId: number) {
@@ -281,7 +284,7 @@ export class EstatesService {
       where: { id: userId },
     });
     if (!user) throw new BadRequestException('Пользователь не найден');
-    return this.getEstates(1, 20, { userId: user.id, availability: 'SOLD' }, { select: getEstatesSelect });
+    return this.getEstates(1, 20, { userId: user.id, availability: 'SOLD' }, { select: getCrmListEstatesSelect });
   }
 
   async adminUpdateEstate(
@@ -318,18 +321,18 @@ export class EstatesService {
     return this.deleteEstate(estateId);
   }
 
-  async getCrmEstateById(userId: number, estateId: number) {
+  async getCrmEstateBySlug(userId: number, estateSlug: number) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!user) throw new BadRequestException('Пользователь не найден');
     const estate = await this.prisma.estate.findFirst({
-      where: { id: estateId, userId: user.id },
-      select: getEstatesSelect,
+      where: { slug: String(estateSlug), userId: user.id },
+      select: getCrmEstateSelect,
     });
     if (!estate) throw new BadRequestException('Объявление не найдено');
-    const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estateId);
-    const document = await this.uploadsService.getMediaById(EntityType.ESTATE_PDF, estateId);
+    const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estate.id);
+    const document = await this.uploadsService.getMediaById(EntityType.LEASE_PDF, estate.leaseAgreement?.id);
     const filteredMedia = media.filter((m) => m.id !== estate.EstatePrimaryMedia?.id);
 
     const estateWithMedia = {
@@ -341,6 +344,66 @@ export class EstatesService {
     return {
       data: estateWithMedia,
     };
+  }
+
+  async createLeaseAgreement(
+    userId: number,
+    dto: CreateLeaseAgreementDto,
+    files: { photos?: Express.Multer.File[]; document?: Express.Multer.File[] },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    const existingAgreement = await this.prisma.leaseAgreement.findFirst({
+      where: {
+        estateId: Number(dto.estateId),
+      },
+    });
+
+    if (existingAgreement) {
+      throw new BadRequestException('Договор для этого объекта уже существует.');
+    }
+    return this.prisma.$transaction(async (prisma) => {
+      const newAgreement = await prisma.leaseAgreement.create({
+        data: {
+          tenantName: dto.tenantName,
+          tenantPhone: dto.tenantPhone,
+          rentAmount: BigInt(dto.rentAmount),
+          depositAmount: BigInt(dto.depositAmount),
+          endDate: dto.endDate,
+          estateId: Number(dto.estateId),
+          currencyTypeId: Number(dto.currencyTypeId),
+        },
+      });
+
+      if (files && files.photos && files.photos.length > 0) {
+        for (const photo of files.photos) {
+          const fileUrl = await this.uploadsService.saveFile(photo);
+          await prisma.media.create({
+            data: {
+              url: fileUrl,
+              size: photo.size,
+              entityId: newAgreement.id,
+              entityType: EntityType.LEASE_PHOTOS,
+            },
+          });
+        }
+      }
+      if (files && files.document && files.document.length > 0) {
+        const docFile = files.document[0];
+        const fileUrl = await this.uploadsService.saveFile(docFile);
+        await prisma.media.create({
+          data: {
+            url: fileUrl,
+            size: docFile.size,
+            entityId: newAgreement.id,
+            entityType: EntityType.LEASE_PDF,
+          },
+        });
+      }
+      return newAgreement;
+    });
   }
 
   /* =================== PRIVATE ================== */

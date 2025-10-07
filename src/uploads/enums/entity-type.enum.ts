@@ -2,5 +2,6 @@ export enum EntityType {
   ESTATE = 'estate',
   AVATAR = 'avatar',
   ADVERTISEMENT = 'advertisement',
-  ESTATE_PDF = 'estate_pdf',
+  LEASE_PDF = 'lease_pdf',
+  LEASE_PHOTOS = 'lease_photos',
 }
