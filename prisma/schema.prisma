@@ -1,6 +1,7 @@
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin", "darwin-arm64"]
 }
 
 datasource db {
@@ -51,9 +52,9 @@ model Estate {
   primaryMediaId Int? @unique
   primaryImageUrl String?
   availability EstateAvailabilityStatus @default(AVAILABLE)
-  deposit BigInt?
-  leaseTermUnit String?
   isExclusive Boolean @default(false)
+  isArchived Boolean @default(false)
+  isSentToCrm Boolean @default(false)
   leaseEndDate DateTime?
 
   createdAt DateTime @default(now())
@@ -73,6 +74,7 @@ model Estate {
   transactions Transaction[]
   status EstateStatus?
   views EstateView?
+  utilityServices UtilityServices?
   leaseAgreement LeaseAgreement?
   translations EstateTranslation[]
 
@@ -97,6 +99,22 @@ model LeaseAgreement {
   currencyType CurrencyType @relation(fields: [currencyTypeId], references: [id], onDelete: Cascade)
 
   @@map("lease_agreements")
+}
+
+model UtilityServices {
+  id Int @default(autoincrement()) @id
+  estateId Int @unique
+  wifi String?
+  water String?
+  electricity String?
+  garbage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  estate Estate @relation(fields: [estateId], references: [id], onDelete: Cascade)
+
+  @@map("utility_services")
 }
 
 model EstateStatus {

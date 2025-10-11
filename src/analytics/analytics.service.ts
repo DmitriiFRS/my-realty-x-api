@@ -60,37 +60,39 @@ export class AnalyticsService {
         },
       },
     });
-    const result: {
-      currentMonth: typeof transactions;
-      lastMonth: typeof transactions;
-      twoMonthsAgo: typeof transactions;
-    } = {
-      currentMonth: [],
-      lastMonth: [],
-      twoMonthsAgo: [],
-    };
+
     const now = new Date();
-    const currentMonthIndex = now.getMonth();
-    const currentYear = now.getFullYear();
+    const getMonthName = (date: Date) => date.toLocaleString('ru-RU', { month: 'long' });
+
+    const currentMonthDate = new Date(now);
+    const lastMonthDate = new Date(now);
+    lastMonthDate.setMonth(now.getMonth() - 1);
+    const twoMonthsAgoDate = new Date(now);
+    twoMonthsAgoDate.setMonth(now.getMonth() - 2);
+
+    const monthNames = {
+      current: getMonthName(currentMonthDate),
+      last: getMonthName(lastMonthDate),
+      twoMonthsAgo: getMonthName(twoMonthsAgoDate),
+    };
+
+    const result: { [key: string]: typeof transactions } = {
+      [monthNames.current]: [],
+      [monthNames.last]: [],
+      [monthNames.twoMonthsAgo]: [],
+    };
 
     transactions.forEach((transaction) => {
-      const transactionMonthIndex = transaction.dealDate.getMonth();
-      const transactionYear = transaction.dealDate.getFullYear();
-
-      if (transactionYear === currentYear && transactionMonthIndex === currentMonthIndex) {
-        result.currentMonth.push(transaction);
-        return;
-      }
-      const lastMonthDate = new Date(now);
-      lastMonthDate.setMonth(currentMonthIndex - 1);
-      if (transactionYear === lastMonthDate.getFullYear() && transactionMonthIndex === lastMonthDate.getMonth()) {
-        result.lastMonth.push(transaction);
-        return;
-      }
-      const twoMonthsAgoDate = new Date(now);
-      twoMonthsAgoDate.setMonth(currentMonthIndex - 2);
-      if (transactionYear === twoMonthsAgoDate.getFullYear() && transactionMonthIndex === twoMonthsAgoDate.getMonth()) {
-        result.twoMonthsAgo.push(transaction);
+      const transactionDate = transaction.dealDate;
+      if (transactionDate.getFullYear() === currentMonthDate.getFullYear() && transactionDate.getMonth() === currentMonthDate.getMonth()) {
+        result[monthNames.current].push(transaction);
+      } else if (transactionDate.getFullYear() === lastMonthDate.getFullYear() && transactionDate.getMonth() === lastMonthDate.getMonth()) {
+        result[monthNames.last].push(transaction);
+      } else if (
+        transactionDate.getFullYear() === twoMonthsAgoDate.getFullYear() &&
+        transactionDate.getMonth() === twoMonthsAgoDate.getMonth()
+      ) {
+        result[monthNames.twoMonthsAgo].push(transaction);
       }
     });
     return result;

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { CreateEstateDto } from './dto/create-estate.dto';
 import { UploadsService } from 'src/uploads/uploads.service';
@@ -271,6 +271,166 @@ export class EstatesService {
     return this.getEstates(1, 20, { userId: user.id }, { select: getEstatesSelect });
   }
 
+  // это когда юзер получает недвиги по параметрам
+  async getCrmEstatesByUserId(userId: number, filter?: 'archived' | 'exclusive' | 'all', page: number = 1, pageSize: number = 4) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+
+    const where: Prisma.EstateWhereInput = { userId };
+
+    if (filter === 'archived') {
+      where.isArchived = true;
+    } else if (filter === 'exclusive') {
+      where.isExclusive = true;
+    }
+
+    const queryArgs: { include: Prisma.EstateInclude } = {
+      include: {
+        EstatePrimaryMedia: true,
+        status: true,
+        city: true,
+        district: true,
+      },
+    };
+
+    return this.getEstates(page, pageSize, where, queryArgs);
+  }
+
+  //архивируем недвигу
+  async archiveEstate(userId: number, estateId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    const id = Number(estateId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException('Некорректный id объявления');
+    }
+
+    const estate = await this.prisma.estate.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        isArchived: true,
+      },
+    });
+
+    if (!estate) throw new NotFoundException('Объявление не найдено');
+
+    const userIsOwner = estate.userId === userId;
+    if (!userIsOwner) {
+      throw new ForbiddenException('Нет прав на архивирование этого объявления');
+    }
+    if (estate.isArchived) {
+      return {
+        message: 'Объявление уже в архиве',
+        data: estate,
+      };
+    }
+    const updatedEstate = await this.prisma.estate.update({
+      where: { id },
+      data: {
+        isArchived: true,
+      },
+      include: {
+        EstatePrimaryMedia: true,
+        status: true,
+        city: true,
+        district: true,
+      },
+    });
+    return {
+      message: 'Объявление успешно заархивировано',
+      data: updatedEstate,
+    };
+  }
+
+  //Составляем договор и прокидываем в срм
+  async createLeaseAgreement(
+    userId: number,
+    dto: CreateLeaseAgreementDto,
+    files: { photos?: Express.Multer.File[]; document?: Express.Multer.File[] },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    const existingAgreement = await this.prisma.leaseAgreement.findFirst({
+      where: {
+        estateId: Number(dto.estateId),
+      },
+    });
+
+    if (existingAgreement) {
+      throw new BadRequestException('Договор для этого объекта уже существует.');
+    }
+    return this.prisma.$transaction(async (prisma) => {
+      const newAgreement = await prisma.leaseAgreement.create({
+        data: {
+          tenantName: dto.tenantName,
+          tenantPhone: dto.tenantPhone,
+          rentAmount: BigInt(dto.rentAmount),
+          depositAmount: BigInt(dto.depositAmount),
+          endDate: dto.endDate,
+          estateId: Number(dto.estateId),
+          currencyTypeId: Number(dto.currencyTypeId),
+        },
+      });
+
+      await prisma.estate.update({
+        where: {
+          id: Number(dto.estateId),
+        },
+        data: {
+          availability: 'SOLD',
+          isSentToCrm: true,
+        },
+      });
+
+      await prisma.transaction.create({
+        data: {
+          amount: BigInt(dto.rentAmount),
+          clientName: dto.tenantName,
+          dealDate: new Date(),
+          estateId: Number(dto.estateId),
+          userId: userId,
+        },
+      });
+
+      if (files && files.photos && files.photos.length > 0) {
+        for (const photo of files.photos) {
+          const fileUrl = await this.uploadsService.saveFile(photo);
+          await prisma.media.create({
+            data: {
+              url: fileUrl,
+              size: photo.size,
+              entityId: newAgreement.id,
+              entityType: EntityType.LEASE_PHOTOS,
+            },
+          });
+        }
+      }
+      if (files && files.document && files.document.length > 0) {
+        const docFile = files.document[0];
+        const fileUrl = await this.uploadsService.saveFile(docFile);
+        await prisma.media.create({
+          data: {
+            url: fileUrl,
+            size: docFile.size,
+            entityId: newAgreement.id,
+            entityType: EntityType.LEASE_PDF,
+          },
+        });
+      }
+
+      return newAgreement;
+    });
+  }
+
   async getFreeEstates(userId: number) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -346,64 +506,12 @@ export class EstatesService {
     };
   }
 
-  async createLeaseAgreement(
-    userId: number,
-    dto: CreateLeaseAgreementDto,
-    files: { photos?: Express.Multer.File[]; document?: Express.Multer.File[] },
-  ) {
+  async getCrmListEstates(userId: number) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!user) throw new BadRequestException('Пользователь не найден');
-    const existingAgreement = await this.prisma.leaseAgreement.findFirst({
-      where: {
-        estateId: Number(dto.estateId),
-      },
-    });
-
-    if (existingAgreement) {
-      throw new BadRequestException('Договор для этого объекта уже существует.');
-    }
-    return this.prisma.$transaction(async (prisma) => {
-      const newAgreement = await prisma.leaseAgreement.create({
-        data: {
-          tenantName: dto.tenantName,
-          tenantPhone: dto.tenantPhone,
-          rentAmount: BigInt(dto.rentAmount),
-          depositAmount: BigInt(dto.depositAmount),
-          endDate: dto.endDate,
-          estateId: Number(dto.estateId),
-          currencyTypeId: Number(dto.currencyTypeId),
-        },
-      });
-
-      if (files && files.photos && files.photos.length > 0) {
-        for (const photo of files.photos) {
-          const fileUrl = await this.uploadsService.saveFile(photo);
-          await prisma.media.create({
-            data: {
-              url: fileUrl,
-              size: photo.size,
-              entityId: newAgreement.id,
-              entityType: EntityType.LEASE_PHOTOS,
-            },
-          });
-        }
-      }
-      if (files && files.document && files.document.length > 0) {
-        const docFile = files.document[0];
-        const fileUrl = await this.uploadsService.saveFile(docFile);
-        await prisma.media.create({
-          data: {
-            url: fileUrl,
-            size: docFile.size,
-            entityId: newAgreement.id,
-            entityType: EntityType.LEASE_PDF,
-          },
-        });
-      }
-      return newAgreement;
-    });
+    return this.getEstates(1, 20, { userId: user.id, isArchived: false }, { select: getCrmListEstatesSelect });
   }
 
   /* =================== PRIVATE ================== */

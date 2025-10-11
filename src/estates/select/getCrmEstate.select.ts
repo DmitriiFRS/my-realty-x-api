@@ -81,4 +81,13 @@ export const getCrmEstateSelect = {
       id: true,
     },
   },
+  utilityServices: {
+    select: {
+      id: true,
+      wifi: true,
+      water: true,
+      electricity: true,
+      garbage: true,
+    },
+  },
 };

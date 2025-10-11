@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -23,6 +24,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
 import { GetFavoritesDto } from './dto/get-favorites.dto';
 import { CreateLeaseAgreementDto } from './dto/create-lease-agreement.dto';
+import { EstatesFilterParamDto } from './dto/estate-filter-param.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
@@ -167,10 +169,17 @@ export class EstatesController {
   }
   /* ============================Realtor crm================================= */
 
-  @Get('crm/my-estates')
+  @Get('crm/my-estates/:filter')
   @UseGuards(JwtAuthGuard)
-  async getRealtorEstates(@GetUser('id') userId: number) {
-    return this.estatesService.getEstatesByUserId(userId);
+  async getRealtorEstates(
+    @GetUser('id') userId: number,
+    @Param(new ValidationPipe({ transform: true, whitelist: true })) params: EstatesFilterParamDto,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const pageNum = page ? Number(page) : 1;
+    const pageSizeNum = pageSize ? Number(pageSize) : 4;
+    return this.estatesService.getCrmEstatesByUserId(userId, params.filter, pageNum, pageSizeNum);
   }
 
   @Get('crm/estates/free')
@@ -185,19 +194,25 @@ export class EstatesController {
     return this.estatesService.getSoldEstates(userId);
   }
 
-  @Get('crm/estates/estate/:slug')
+  @Get('crm/estate/:slug')
   @UseGuards(JwtAuthGuard)
   async getCrmEstateBySlug(@GetUser('id') userId: number, @Param('slug') slug: number) {
     console.log('slug', slug);
     return this.estatesService.getCrmEstateBySlug(userId, slug);
   }
 
+  @Patch('crm/estates/archive/:id')
+  @UseGuards(JwtAuthGuard)
+  async archiveEstate(@GetUser('id') userId: number, @Param('id') estateId: number) {
+    return await this.estatesService.archiveEstate(userId, estateId);
+  }
+
   @Post('lease/create')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'photos', maxCount: 10 }, // для "Фотографии в день сдачи"
-      { name: 'document', maxCount: 1 }, // для "Документы" (1 файл)
+      { name: 'photos', maxCount: 10 },
+      { name: 'document', maxCount: 1 },
     ]),
   )
   async create(
