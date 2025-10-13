@@ -115,7 +115,11 @@ export class EstatesService {
     };
   }
 
-  async createEstate(userId: number, dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {
+  async createClientEstate(
+    userId: number,
+    dto: CreateEstateDto,
+    files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
+  ) {
     if (!files.primaryImage || files.primaryImage.length === 0) {
       throw new BadRequestException('Для создания объявления требуется хотя бы одно изображение.');
     }
@@ -447,6 +451,10 @@ export class EstatesService {
     return this.getEstates(1, 20, { userId: user.id, availability: 'SOLD' }, { select: getCrmListEstatesSelect });
   }
 
+  async createAdminEstate(dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {
+    return this.createEstate(dto, files);
+  }
+
   async adminUpdateEstate(
     userId: number,
     estateId: number,
@@ -737,6 +745,86 @@ export class EstatesService {
         await this.uploadsService.deleteFiles(urlsToDelete);
       }
       return { message: 'Объявление и связанные файлы успешно удалены' };
+    });
+  }
+
+  private async createEstate(dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {
+    if (!files.primaryImage || files.primaryImage.length === 0) {
+      throw new BadRequestException('Для создания объявления требуется хотя бы одно изображение.');
+    }
+    const { area, description, price, currencyTypeId, dealTermId, districtId, estateTypeId, roomId, features } = dto;
+
+    const timestamp = Date.now().toString().slice(-8);
+    const randomPart = Math.random().toString().substring(2, 8);
+    const uniqueSlug = (randomPart + timestamp).slice(0, 10);
+    const primaryImageFile = files.primaryImage[0];
+    const otherImageFiles = files.images || [];
+
+    return this.prisma.$transaction(async (prisma) => {
+      const estate = await prisma.estate.create({
+        data: {
+          user: { connect: { id: 11 } },
+          slug: uniqueSlug,
+          description,
+          area,
+          price,
+          city: { connect: { id: dto.cityId } },
+          currencyType: { connect: { id: currencyTypeId } },
+          dealTerm: { connect: { id: dealTermId } },
+          district: { connect: { id: districtId } },
+          estateType: { connect: { id: estateTypeId } },
+          room: roomId ? { connect: { id: roomId } } : undefined,
+          features:
+            features && features.length > 0
+              ? {
+                  connect: features.map((id) => ({ id })),
+                }
+              : undefined,
+        },
+      });
+
+      await prisma.estateStatus.create({
+        data: {
+          status: 'PENDING',
+          estateId: estate.id,
+        },
+      });
+
+      const primaryImageUrl = await this.uploadsService.saveFile(primaryImageFile);
+      const primaryMedia = await prisma.media.create({
+        data: {
+          url: primaryImageUrl,
+          size: primaryImageFile.size,
+          entityId: estate.id,
+          entityType: EntityType.ESTATE,
+          order: 0,
+        },
+      });
+      const updatedEstate = await prisma.estate.update({
+        where: { id: estate.id },
+        data: {
+          primaryMediaId: primaryMedia.id,
+          primaryImageUrl: primaryMedia.url,
+        },
+      });
+
+      if (otherImageFiles.length > 0) {
+        await Promise.all(
+          otherImageFiles.map(async (file, index) => {
+            const imageUrl = await this.uploadsService.saveFile(file);
+            return prisma.media.create({
+              data: {
+                url: imageUrl,
+                size: file.size,
+                entityId: estate.id,
+                entityType: EntityType.ESTATE,
+                order: index + 1,
+              },
+            });
+          }),
+        );
+      }
+      return updatedEstate;
     });
   }
 }

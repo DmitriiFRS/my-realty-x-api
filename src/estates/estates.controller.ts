@@ -160,7 +160,32 @@ export class EstatesController {
     @Body() dto: CreateEstateDto,
     @UploadedFiles() files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
   ) {
-    return this.estatesService.createEstate(userId, dto, files);
+    return this.estatesService.createClientEstate(userId, dto, files);
+  }
+
+  @Post('admin-create')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'primaryImage', maxCount: 1 },
+        { name: 'images', maxCount: 10 },
+      ],
+      {
+        limits: { fileSize: 5 * 1024 * 1024 },
+        fileFilter: (req, file, cb) => {
+          if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
+            return cb(new Error('Только изображения'), false);
+          }
+          cb(null, true);
+        },
+      },
+    ),
+  )
+  async createAdminEstate(
+    @Body() dto: CreateEstateDto,
+    @UploadedFiles() files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
+  ) {
+    return this.estatesService.createAdminEstate(dto, files);
   }
 
   @Delete('/admin-delete/:id')
