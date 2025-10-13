@@ -4,7 +4,6 @@ import { FindOrCreateTgDto } from './dto/findOrCreateTg.dto';
 import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UpdateReminderDto } from './dto/updateReminder.dto';
-import { CreateReminderDto } from './dto/createReminder.dto';
 
 @Controller('users')
 export class UsersController {
@@ -32,13 +31,6 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async deleteReminder(@GetUser('id') userId: number, @Param('id') reminderId: number) {
     return this.usersService.deleteReminder(userId, reminderId);
-  }
-
-  @Post('crm/reminders')
-  @UseGuards(JwtAuthGuard)
-  @UsePipes(new ValidationPipe())
-  async createReminder(@GetUser('id') userId: number, @Body() dto: CreateReminderDto) {
-    return this.usersService.createReminder(userId, dto);
   }
 
   @Patch('crm/reminders/:id')

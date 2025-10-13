@@ -5,7 +5,6 @@ import { buildUserNameFromTg } from 'src/helpers/buildUserNameFromTg';
 import { Prisma, User } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { UpdateReminderDto } from './dto/updateReminder.dto';
-import { CreateReminderDto } from './dto/createReminder.dto';
 
 @Injectable()
 export class UsersService {
@@ -76,6 +75,7 @@ export class UsersService {
         userId: userId,
       },
     });
+    return reminders;
   }
 
   async deleteReminder(userId: number, reminderId: number) {
@@ -92,17 +92,6 @@ export class UsersService {
       where: { id: reminderId },
     });
     return { success: true };
-  }
-
-  async createReminder(userId: number, dto: CreateReminderDto) {
-    const newReminder = await this.prisma.reminder.create({
-      data: {
-        text: dto.text,
-        remindAt: dto.remindAt,
-        userId: userId,
-      },
-    });
-    return newReminder;
   }
 
   async updateReminder(userId: number, reminderId: number, dto: UpdateReminderDto) {

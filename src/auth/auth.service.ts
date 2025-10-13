@@ -201,6 +201,11 @@ export class AuthService {
     };
   }
 
+  async adminLogin(user: IUser) {
+    const tokens = await this.getTokens(user.id, user.phone);
+    return tokens;
+  }
+
   private validateTelegramInitData(initData: string): Record<string, string> {
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');

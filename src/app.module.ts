@@ -14,6 +14,8 @@ import { CurrencyTypesModule } from './currency-types/currency-types.module';
 import { AuthModule } from './auth/auth.module';
 import { EstateFeaturesModule } from './estate-features/estate-features.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { RemindersModule } from './reminders/reminders.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { AnalyticsModule } from './analytics/analytics.module';
     CurrencyTypesModule,
     EstateFeaturesModule,
     AnalyticsModule,
+    RemindersModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],
