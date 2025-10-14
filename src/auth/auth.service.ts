@@ -252,7 +252,8 @@ export class AuthService {
     const userByTg = await this.prisma.user.findUnique({ where: { telegramId } });
     if (userByTg) {
       if (userByTg.phone !== dto.phone) {
-        throw new BadRequestException('Этот Telegram-аккаунт уже привязан к другому номеру телефона.');
+        console.log('userByTg.phone !== dto.phone', userByTg.phone, dto.phone);
+        throw new BadRequestException('Введенный номер телефона не совпадает с номером, который привязан к этому Telegram-аккаунту.');
       }
       return this.login(userByTg as IUser);
       // error userByTg.phone !== dto.phone
