@@ -1,4 +1,4 @@
-import { Controller, HttpCode, HttpStatus, Post, UseGuards, Body, ForbiddenException } from '@nestjs/common';
+import { Controller, HttpCode, HttpStatus, Post, UseGuards, Body, ForbiddenException, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -6,6 +6,8 @@ import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { VerifySmsCodeDto } from './dto/verify-sms-code.dto';
 import { RequestCodeDto } from './dto/request-code.dto';
 import { TelegramLoginDto } from './dto/telegram-login.dto';
+import { AdminAuthDto } from './dto/admin-auth.dto';
+import { AdminRegisterDto } from './dto/admin-register.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -57,5 +59,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async loginWithTelegram(@Body() dto: TelegramLoginDto) {
     return this.authService.loginWithTelegram(dto);
+  }
+
+  @Post('admin-login')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true }))
+  async auth(@Body() dto: AdminAuthDto) {
+    return this.authService.adminLogin(dto.phone, dto.password);
+  }
+
+  @Post('register-admin')
+  @UsePipes(new ValidationPipe({ transform: true }))
+  @HttpCode(HttpStatus.CREATED)
+  async register(@Body() dto: AdminRegisterDto) {
+    return this.authService.adminRegister(dto);
   }
 }

@@ -15,6 +15,12 @@ export class UsersController {
     return this.usersService.getMe(userId);
   }
 
+  @Get('get-me-admin')
+  @UseGuards(JwtAuthGuard)
+  async getAdmin(@GetUser('id') userId: number) {
+    return this.usersService.getAdmin(userId);
+  }
+
   @Post('auth')
   @UsePipes(new ValidationPipe())
   async authByTelegram(@Body() dto: FindOrCreateTgDto) {

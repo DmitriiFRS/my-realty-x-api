@@ -70,7 +70,21 @@ export class EstatesService {
   }
 
   async getFilteredEstates(dto: GetFilteredEstatesDto) {
-    const { cityId, districtId, areaFrom, areaTo, currencyTypeId, dealTermId, priceFrom, priceTo, features, page = 1, limit = 2 } = dto;
+    const {
+      cityId,
+      districtId,
+      areaFrom,
+      areaTo,
+      currencyTypeId,
+      dealTermId,
+      priceFrom,
+      priceTo,
+      features,
+      page = 1,
+      limit = 2,
+      sortBy,
+      sortOrder,
+    } = dto;
 
     const filters: Prisma.EstateWhereInput = {
       status: { status: 'VERIFIED' },
@@ -83,15 +97,31 @@ export class EstatesService {
       features: features && features.length > 0 ? { some: { id: { in: features.map((id) => Number(id)) } } } : undefined,
     };
 
-    const skip = (page - 1) * limit;
-    const take = limit;
+    // Определяем orderBy: default = price asc
+    const direction: Prisma.SortOrder = sortOrder === 'desc' ? 'desc' : 'asc';
+
+    let orderBy: Prisma.EstateOrderByWithRelationInput = { price: 'asc' };
+
+    if (sortBy === 'price') {
+      orderBy = { price: direction };
+    } else if (sortBy === 'date') {
+      orderBy = { createdAt: direction };
+    } else if (sortBy === 'area') {
+      orderBy = { area: direction };
+    } else {
+      // если sortBy не задан — default price asc
+      orderBy = { price: 'asc' };
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+    const take = Number(limit);
 
     const [estates, total] = await Promise.all([
       this.prisma.estate.findMany({
         where: filters,
         skip,
         take,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         select: getEstatesSelect,
       }),
       this.prisma.estate.count({ where: filters }),
@@ -108,9 +138,9 @@ export class EstatesService {
       data: estatesWithMedia,
       meta: {
         total,
-        page,
-        limit,
-        lastPage: Math.ceil(total / limit),
+        page: Number(page),
+        limit: Number(limit),
+        lastPage: Math.ceil(total / Number(limit)),
       },
     };
   }

@@ -10,6 +10,8 @@ import { SmsVerificationType } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { VerifySmsCodeDto } from './dto/verify-sms-code.dto';
 import { TelegramLoginDto } from './dto/telegram-login.dto';
+import { AdminRegisterDto } from './dto/admin-register.dto';
+import { hashPassword } from 'src/utils/bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -86,6 +88,72 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Не удалось найти или создать пользователя.');
 
     return this.login(user as IUser);
+  }
+
+  async adminRegister(dto: AdminRegisterDto) {
+    const { phone, password, name, roleId = 1 } = dto;
+    if (![1, 2].includes(roleId)) {
+      throw new BadRequestException('roleId must be 1 or 2');
+    }
+    const existsByPhone = await this.prisma.user.findUnique({ where: { phone } });
+    if (existsByPhone) {
+      throw new ConflictException('Номер телефона уже используется');
+    }
+    const existsByName = await this.prisma.user.findUnique({ where: { name } });
+    if (existsByName) {
+      throw new ConflictException('Display name уже используется');
+    }
+    const slug = `u-${nanoid(10)}`;
+    const hashedPassword = await hashPassword(password);
+    const created = await this.prisma.user.create({
+      data: {
+        phone,
+        password: hashedPassword,
+        name,
+        roleId,
+        slug,
+      },
+      select: {
+        id: true,
+        phone: true,
+        name: true,
+        slug: true,
+        roleId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return { success: true, user: created };
+  }
+
+  async adminLogin(phone: string, password: string) {
+    if (!phone || !password) throw new BadRequestException('phone and password are required');
+    console.log('Admin login attempt for phone:', phone);
+    const user = await this.usersService.findOne(phone);
+    console.log('User found:', user ? { id: user.id, phone: user.phone, roleId: user.roleId } : null);
+    if (!user) throw new UnauthorizedException('Неверные учётные данные');
+    if (![1, 2].includes(user.roleId)) {
+      throw new ForbiddenException('Доступ запрещён: пользователь не администратор');
+    }
+    if (!user.password) {
+      throw new BadRequestException('Пароль не установлен для этого пользователя');
+    }
+    const passwordMatches = await bcrypt.compare(password, user.password);
+    if (!passwordMatches) {
+      throw new UnauthorizedException('Неверные учётные данные');
+    }
+
+    const payload = { sub: user.id, phone: user.phone };
+    const secret = this.configService.get<string>('JWT_ACCESS_SECRET');
+    const expiresIn = this.configService.get<string | number>('JWT_ACCESS_EXPIRATION') ?? '2h';
+    if (!secret) {
+      throw new Error('JWT_ACCESS_SECRET is not configured');
+    }
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret,
+      expiresIn,
+    });
+    return { accessToken };
   }
 
   async login(user: IUser) {
@@ -199,11 +267,6 @@ export class AuthService {
       code: 'PHONE_NEEDS_VERIFICATION',
       verificationCode: codeData.code,
     };
-  }
-
-  async adminLogin(user: IUser) {
-    const tokens = await this.getTokens(user.id, user.phone);
-    return tokens;
   }
 
   private validateTelegramInitData(initData: string): Record<string, string> {

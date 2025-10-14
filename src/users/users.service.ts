@@ -64,6 +64,16 @@ export class UsersService {
     };
   }
 
+  async getAdmin(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    if (!user) throw new BadRequestException('User not found');
+    if (user.role.slug !== 'super-admin' && user.role.slug !== 'admin') throw new BadRequestException('User is not admin');
+    return user;
+  }
+
   async getReminders(userId: number) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

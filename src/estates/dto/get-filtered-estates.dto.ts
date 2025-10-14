@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsOptional, IsInt, Min, Max, IsArray, IsString } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsArray, IsString, IsIn } from 'class-validator';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 export class GetFilteredEstatesDto extends PaginationDto {
@@ -57,7 +57,19 @@ export class GetFilteredEstatesDto extends PaginationDto {
     if (typeof value === 'string' || typeof value === 'number') return [value];
     return [];
   })
-  @IsArray({ message: 'rooms должен быть массивом' })
+  @IsArray({ message: 'features должен быть массивом' })
   @IsString({ each: true })
   features?: string[];
+
+  // Основной параметр сортировки: только простые значения
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.toLowerCase() : value))
+  @IsIn(['price', 'area', 'date'])
+  sortBy?: 'price' | 'area' | 'date';
+
+  // Направление сортировки
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.toLowerCase() : value))
+  @IsIn(['asc', 'desc'])
+  sortOrder?: 'asc' | 'desc';
 }
