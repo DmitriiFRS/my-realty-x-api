@@ -58,4 +58,9 @@ export class CreateEstateDto {
   @IsArray()
   @IsInt({ each: true })
   features?: number[];
+
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  targetUserId: number;
 }

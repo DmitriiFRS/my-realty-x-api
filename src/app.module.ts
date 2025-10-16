@@ -16,6 +16,7 @@ import { EstateFeaturesModule } from './estate-features/estate-features.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AnalyticsModule,
     RemindersModule,
     NotificationsModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

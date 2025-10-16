@@ -65,7 +65,6 @@ export class EstatesService {
 
     if (!estate) return new NotFoundException('Объявление не найдено');
     const media = await this.uploadsService.getMediaById(EntityType.ESTATE, estate.id);
-    console.log(estate);
     return { data: { ...estate, media } };
   }
 
@@ -229,11 +228,7 @@ export class EstatesService {
     });
   }
 
-  async getEstateById(userId: number, estateId: number) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) throw new BadRequestException('Пользователь не найден');
+  async getEstateById(estateId: number) {
     const estate = await this.prisma.estate.findUnique({
       where: { id: estateId },
       select: getEstatesSelect,
@@ -481,10 +476,6 @@ export class EstatesService {
     return this.getEstates(1, 20, { userId: user.id, availability: 'SOLD' }, { select: getCrmListEstatesSelect });
   }
 
-  async createAdminEstate(dto: CreateEstateDto, files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] }) {
-    return this.createEstate(dto, files);
-  }
-
   async adminUpdateEstate(
     userId: number,
     estateId: number,
@@ -494,8 +485,9 @@ export class EstatesService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
+    console.log(user);
     if (!user) throw new BadRequestException('Пользователь не найден');
-    return this.updateEstate({ estateId, dto, files });
+    return this.updateEstate({ estateUserId: dto.targetUserId, estateId, dto, files });
   }
 
   async userUpdateEstate(
@@ -566,6 +558,7 @@ export class EstatesService {
     estateUserId?: number;
     isUser?: boolean | undefined;
   }) {
+    console.log(dto);
     const estate = await this.prisma.estate.findUnique({
       where: { id: estateId },
     });
@@ -577,7 +570,6 @@ export class EstatesService {
     const newPrimaryImageFile = files?.primaryImage?.[0];
     const newImageFiles = files?.images || [];
     const primaryId = estate.primaryMediaId ?? null;
-    console.log(existingImageIds);
     return this.prisma.$transaction(async (prisma) => {
       const currentMedia = await prisma.media.findMany({
         where: {
@@ -655,6 +647,7 @@ export class EstatesService {
           estateType: { connect: { id: estateTypeId } },
           room: roomId ? { connect: { id: roomId } } : undefined,
           features: features !== undefined ? { set: features.map((id) => ({ id })) } : undefined,
+          user: estateUserId ? { connect: { id: estateUserId } } : undefined,
           ...primaryImageUpdateData,
         },
       });
@@ -856,5 +849,134 @@ export class EstatesService {
       }
       return updatedEstate;
     });
+  }
+
+  async createAdminEstate(
+    userId: number,
+    dto: CreateEstateDto,
+    files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
+  ) {
+    if (!files.primaryImage || files.primaryImage.length === 0) {
+      throw new BadRequestException('Для создания объявления требуется хотя бы одно изображение.');
+    }
+    const { area, description, price, currencyTypeId, dealTermId, districtId, estateTypeId, roomId, features, targetUserId } = dto;
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        id: targetUserId,
+      },
+      include: {
+        role: {
+          select: {
+            slug: true,
+          },
+        },
+      },
+    });
+
+    if (!existingUser || (existingUser.role.slug !== 'realtor' && existingUser.role.slug !== 'user')) {
+      throw new BadRequestException('Вы не можете создавать объявления для администраторов или пользователь не найден');
+    }
+
+    const timestamp = Date.now().toString().slice(-8);
+    const randomPart = Math.random().toString().substring(2, 8);
+    const uniqueSlug = (randomPart + timestamp).slice(0, 10);
+    const primaryImageFile = files.primaryImage[0];
+    const otherImageFiles = files.images || [];
+
+    return this.prisma.$transaction(async (prisma) => {
+      const estate = await prisma.estate.create({
+        data: {
+          user: { connect: { id: targetUserId } },
+          slug: uniqueSlug,
+          description,
+          area,
+          price,
+          city: { connect: { id: dto.cityId } },
+          currencyType: { connect: { id: currencyTypeId } },
+          dealTerm: { connect: { id: dealTermId } },
+          district: { connect: { id: districtId } },
+          estateType: { connect: { id: estateTypeId } },
+          room: roomId ? { connect: { id: roomId } } : undefined,
+          features:
+            features && features.length > 0
+              ? {
+                  connect: features.map((id) => ({ id })),
+                }
+              : undefined,
+        },
+      });
+
+      await prisma.estateStatus.create({
+        data: {
+          status: 'PENDING',
+          estateId: estate.id,
+        },
+      });
+
+      const primaryImageUrl = await this.uploadsService.saveFile(primaryImageFile);
+      const primaryMedia = await prisma.media.create({
+        data: {
+          url: primaryImageUrl,
+          size: primaryImageFile.size,
+          entityId: estate.id,
+          entityType: EntityType.ESTATE,
+          order: 0,
+        },
+      });
+      const updatedEstate = await prisma.estate.update({
+        where: { id: estate.id },
+        data: {
+          primaryMediaId: primaryMedia.id,
+          primaryImageUrl: primaryMedia.url,
+        },
+      });
+
+      if (otherImageFiles.length > 0) {
+        await Promise.all(
+          otherImageFiles.map(async (file, index) => {
+            const imageUrl = await this.uploadsService.saveFile(file);
+            return prisma.media.create({
+              data: {
+                url: imageUrl,
+                size: file.size,
+                entityId: estate.id,
+                entityType: EntityType.ESTATE,
+                order: index + 1,
+              },
+            });
+          }),
+        );
+      }
+      return updatedEstate;
+    });
+  }
+
+  async getEstatesCount(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new BadRequestException('Пользователь не найден');
+    const count = await this.prisma.estate.count();
+    return { count };
+  }
+
+  async getMonthlyEstateCounts() {
+    const year = new Date().getFullYear();
+    const promises = Array.from({ length: 12 }, (_, month) => {
+      const start = new Date(year, month, 1);
+      const end = new Date(year, month + 1, 1);
+      return this.prisma.estate.count({
+        where: {
+          createdAt: {
+            gte: start,
+            lt: end,
+          },
+        },
+      });
+    });
+
+    const counts = await Promise.all(promises);
+    return counts;
   }
 }

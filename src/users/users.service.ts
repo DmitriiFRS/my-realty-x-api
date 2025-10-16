@@ -1,10 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { FindOrCreateTgDto } from './dto/findOrCreateTg.dto';
 import { buildUserNameFromTg } from 'src/helpers/buildUserNameFromTg';
 import { Prisma, User } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { UpdateReminderDto } from './dto/updateReminder.dto';
+import { SearchUsersDto } from './dto/search-users.dto';
 
 @Injectable()
 export class UsersService {
@@ -262,5 +263,86 @@ export class UsersService {
       }
       throw e;
     }
+  }
+
+  async searchUsers(userId: number, dto: SearchUsersDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new UnauthorizedException('Пользователь не найден');
+    // checkPermissions({ access: 'admin.panel.access', user: user });
+    const query = (dto.searchText || '').trim();
+    if (!query) return { users: [] };
+
+    const phoneQuery = query.replace(/\D/g, '');
+
+    const where = {
+      roleId: { in: [4] },
+      AND: [
+        {
+          OR: [{ name: { contains: query } }, ...(phoneQuery ? [{ phone: { contains: phoneQuery } }] : [])],
+        },
+      ],
+    };
+
+    const users = await this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+      },
+      take: 20,
+      orderBy: { name: 'asc' },
+    });
+    const formattedUsers = users.map((el) => {
+      return {
+        id: el.id,
+        phoneName: `${el.name + ' ' + el.phone}`,
+      };
+    });
+    return { users: formattedUsers };
+  }
+
+  async getUsersCount(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+    // checkPermissions({ access: 'admin.panel.access', user: user });
+    const users = await this.prisma.user.findMany({
+      include: {
+        role: true,
+      },
+    });
+    const count = users.filter((u) => u.role.slug === 'user').length;
+    return { count };
+  }
+
+  async getUsersByRole(userId: number, roleSlug: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+    // checkPermissions({ access: 'admin.panel.access', user: user });
+    const role = await this.prisma.role.findUnique({
+      where: { slug: roleSlug },
+    });
+    if (!role) throw new NotFoundException('Role not found');
+    const users = await this.prisma.user.findMany({
+      where: { roleId: role.id },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        photo: true,
+        rating: true,
+        createdAt: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    return {
+      data: users,
+    };
   }
 }

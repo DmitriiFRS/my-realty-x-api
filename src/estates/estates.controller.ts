@@ -52,7 +52,7 @@ export class EstatesController {
 
   @Get('/estate/:id')
   async getEstateById(@Param('id') id: number) {
-    return this.estatesService.getEstateById(8, id);
+    return this.estatesService.getEstateById(id);
   }
 
   @Get('estate/slug/:slug')
@@ -83,6 +83,7 @@ export class EstatesController {
   }
 
   @Put('/admin-update/:id')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -101,11 +102,12 @@ export class EstatesController {
     ),
   )
   async updateEstateByAdmin(
+    @GetUser('id') userId: number,
     @Param('id') id: number,
     @Body() dto: UpdateEstateDto,
     @UploadedFiles() files: { primaryImage?: Express.Multer.File[]; images?: Express.Multer.File[] },
   ) {
-    return this.estatesService.adminUpdateEstate(8, id, dto, files);
+    return this.estatesService.adminUpdateEstate(userId, id, dto, files);
   }
 
   @Put('/update/:id')
@@ -164,6 +166,7 @@ export class EstatesController {
   }
 
   @Post('admin-create')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -182,10 +185,11 @@ export class EstatesController {
     ),
   )
   async createAdminEstate(
+    @GetUser('id') userId: number,
     @Body() dto: CreateEstateDto,
     @UploadedFiles() files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
   ) {
-    return this.estatesService.createAdminEstate(dto, files);
+    return this.estatesService.createAdminEstate(userId, dto, files);
   }
 
   @Delete('/admin-delete/:id')
@@ -222,7 +226,6 @@ export class EstatesController {
   @Get('crm/estate/:slug')
   @UseGuards(JwtAuthGuard)
   async getCrmEstateBySlug(@GetUser('id') userId: number, @Param('slug') slug: number) {
-    console.log('slug', slug);
     return this.estatesService.getCrmEstateBySlug(userId, slug);
   }
 
@@ -278,5 +281,17 @@ export class EstatesController {
   @UseGuards(JwtAuthGuard)
   async deleteEstateByUser(@GetUser('id') userId: number, @Param('id') id: number) {
     return this.estatesService.adminDeleteEstate(userId, id);
+  }
+
+  @Get('count')
+  @UseGuards(JwtAuthGuard)
+  async getEstatesCount(@GetUser('id') userId: number) {
+    return await this.estatesService.getEstatesCount(userId);
+  }
+
+  @Get('monthly')
+  @UseGuards(JwtAuthGuard)
+  getMonthlyEstateCounts() {
+    return this.estatesService.getMonthlyEstateCounts();
   }
 }
