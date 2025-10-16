@@ -288,10 +288,4 @@ export class EstatesController {
   async getEstatesCount(@GetUser('id') userId: number) {
     return await this.estatesService.getEstatesCount(userId);
   }
-
-  @Get('monthly')
-  @UseGuards(JwtAuthGuard)
-  getMonthlyEstateCounts() {
-    return this.estatesService.getMonthlyEstateCounts();
-  }
 }

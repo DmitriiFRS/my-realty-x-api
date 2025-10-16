@@ -17,6 +17,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RolesModule } from './roles/roles.module';
+import { AdminAnalyticsModule } from './admin/admin-analytics/admin-analytics.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { RolesModule } from './roles/roles.module';
     RemindersModule,
     NotificationsModule,
     RolesModule,
+    AdminAnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService],

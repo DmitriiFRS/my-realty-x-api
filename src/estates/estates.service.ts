@@ -960,23 +960,4 @@ export class EstatesService {
     const count = await this.prisma.estate.count();
     return { count };
   }
-
-  async getMonthlyEstateCounts() {
-    const year = new Date().getFullYear();
-    const promises = Array.from({ length: 12 }, (_, month) => {
-      const start = new Date(year, month, 1);
-      const end = new Date(year, month + 1, 1);
-      return this.prisma.estate.count({
-        where: {
-          createdAt: {
-            gte: start,
-            lt: end,
-          },
-        },
-      });
-    });
-
-    const counts = await Promise.all(promises);
-    return counts;
-  }
 }
