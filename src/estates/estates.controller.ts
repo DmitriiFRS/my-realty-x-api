@@ -25,6 +25,8 @@ import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
 import { GetFavoritesDto } from './dto/get-favorites.dto';
 import { CreateLeaseAgreementDto } from './dto/create-lease-agreement.dto';
 import { EstatesFilterParamDto } from './dto/estate-filter-param.dto';
+import { CreateAdminEstateDto } from './dto/create-admin-estate.dto';
+import { UpdateAdminEstateDto } from './dto/update-admin-estate.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
@@ -104,7 +106,7 @@ export class EstatesController {
   async updateEstateByAdmin(
     @GetUser('id') userId: number,
     @Param('id') id: number,
-    @Body() dto: UpdateEstateDto,
+    @Body() dto: UpdateAdminEstateDto,
     @UploadedFiles() files: { primaryImage?: Express.Multer.File[]; images?: Express.Multer.File[] },
   ) {
     return this.estatesService.adminUpdateEstate(userId, id, dto, files);
@@ -186,7 +188,7 @@ export class EstatesController {
   )
   async createAdminEstate(
     @GetUser('id') userId: number,
-    @Body() dto: CreateEstateDto,
+    @Body() dto: CreateAdminEstateDto,
     @UploadedFiles() files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
   ) {
     return this.estatesService.createAdminEstate(userId, dto, files);

@@ -52,19 +52,25 @@ export class AuthService {
   async verifySmsCodeAndLogin(dto: VerifySmsCodeDto) {
     const { phone, code, type, initData } = dto;
 
+    console.log(phone, type);
+
     const verification = await this.prisma.smsVerification.findUnique({
       where: { phone_type: { phone, type } },
     });
+
+    console.log(verification);
 
     if (verification) {
       await this.prisma.smsVerification.delete({ where: { id: verification.id } });
     }
 
     if (!verification || verification.code !== code || new Date() > verification.expiresAt) {
+      console.log('Invalid or expired code');
       throw new BadRequestException('Неверный код или срок его действия истёк.');
     }
 
     if (initData) {
+      console.log('Logging in with Telegram data');
       const userDataFromTelegram = this.validateTelegramInitData(initData);
       const telegramUser = JSON.parse(userDataFromTelegram.user);
       const telegramId = telegramUser.id.toString();
@@ -84,9 +90,10 @@ export class AuthService {
       const slug = `u-${nanoid(10)}`;
       user = await this.prisma.user.create({ data: { phone, name: baseName, slug } });
     }
+    console.log('user after verification:', user);
 
     if (!user) throw new UnauthorizedException('Не удалось найти или создать пользователя.');
-
+    console.log('User verified and ready to log in:', { id: user.id, phone: user.phone });
     return this.login(user as IUser);
   }
 
@@ -127,10 +134,9 @@ export class AuthService {
   }
 
   async adminLogin(phone: string, password: string) {
-    if (!phone || !password) throw new BadRequestException('phone and password are required');
     console.log('Admin login attempt for phone:', phone);
+    if (!phone || !password) throw new BadRequestException('phone and password are required');
     const user = await this.usersService.findOne(phone);
-    console.log('User found:', user ? { id: user.id, phone: user.phone, roleId: user.roleId } : null);
     if (!user) throw new UnauthorizedException('Неверные учётные данные');
     if (![1, 2].includes(user.roleId)) {
       throw new ForbiddenException('Доступ запрещён: пользователь не администратор');

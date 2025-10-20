@@ -10,6 +10,8 @@ import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
 import { getCrmEstateSelect } from './select/getCrmEstate.select';
 import { CreateLeaseAgreementDto } from './dto/create-lease-agreement.dto';
 import { getCrmListEstatesSelect } from './select/getCrmListEstates.select';
+import { UpdateAdminEstateDto } from './dto/update-admin-estate.dto';
+import { CreateAdminEstateDto } from './dto/create-admin-estate.dto';
 
 @Injectable()
 export class EstatesService {
@@ -479,7 +481,7 @@ export class EstatesService {
   async adminUpdateEstate(
     userId: number,
     estateId: number,
-    dto: UpdateEstateDto,
+    dto: UpdateAdminEstateDto,
     files: { primaryImage?: Express.Multer.File[]; images?: Express.Multer.File[] },
   ) {
     const user = await this.prisma.user.findUnique({
@@ -853,7 +855,7 @@ export class EstatesService {
 
   async createAdminEstate(
     userId: number,
-    dto: CreateEstateDto,
+    dto: CreateAdminEstateDto,
     files: { primaryImage: Express.Multer.File[]; images: Express.Multer.File[] },
   ) {
     if (!files.primaryImage || files.primaryImage.length === 0) {
