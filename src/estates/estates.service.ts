@@ -81,6 +81,7 @@ export class EstatesService {
       priceFrom,
       priceTo,
       features,
+      estateTypeId,
       page = 1,
       limit = 2,
       sortBy,
@@ -96,6 +97,7 @@ export class EstatesService {
       dealTermId: dealTermId ? Number(dealTermId) : undefined,
       price: priceFrom || priceTo ? { gte: priceFrom ?? 0, lte: priceTo ?? 1000000000000 } : undefined,
       features: features && features.length > 0 ? { some: { id: { in: features.map((id) => Number(id)) } } } : undefined,
+      estateTypeId: estateTypeId ? Number(estateTypeId) : undefined,
     };
 
     // Определяем orderBy: default = price asc

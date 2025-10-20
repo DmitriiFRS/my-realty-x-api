@@ -7,6 +7,12 @@ export class GetFilteredEstatesDto extends PaginationDto {
   @IsInt()
   @Min(1)
   @Type(() => Number)
+  estateTypeId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
   cityId?: number;
 
   @IsOptional()
