@@ -3,7 +3,10 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Put,
@@ -27,6 +30,7 @@ import { CreateLeaseAgreementDto } from './dto/create-lease-agreement.dto';
 import { EstatesFilterParamDto } from './dto/estate-filter-param.dto';
 import { CreateAdminEstateDto } from './dto/create-admin-estate.dto';
 import { UpdateAdminEstateDto } from './dto/update-admin-estate.dto';
+import { ReactDto } from './dto/react.dto';
 // import { GetUser } from 'src/common/decorators/get-user.decorator';
 // import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
@@ -289,5 +293,23 @@ export class EstatesController {
   @UseGuards(JwtAuthGuard)
   async getEstatesCount(@GetUser('id') userId: number) {
     return await this.estatesService.getEstatesCount(userId);
+  }
+
+  @Post('estate/:id/react')
+  @HttpCode(HttpStatus.OK)
+  async react(@GetUser('id') userId: number, @Param('id', ParseIntPipe) id: number, @Body() dto: ReactDto) {
+    const result = await this.estatesService.toggleReaction(userId, id, dto.type);
+    return { message: 'ok', data: result };
+  }
+  @Get('estate/:id/reaction')
+  async getUserReaction(@GetUser('id') userId: number, @Param('id', ParseIntPipe) id: number) {
+    const reaction = await this.estatesService.getUserReaction(userId, id);
+    return { data: { type: reaction ? reaction.type : null } };
+  }
+
+  @Post('estate/:id/reactions/recalc')
+  async recalc(@Param('id', ParseIntPipe) id: number) {
+    const counts = await this.estatesService.recalcEstateCounters(id);
+    return { message: 'recalculated', data: counts };
   }
 }

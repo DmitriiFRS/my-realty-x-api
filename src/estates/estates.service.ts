@@ -3,7 +3,7 @@ import { PrismaService } from 'src/prisma.service';
 import { CreateEstateDto } from './dto/create-estate.dto';
 import { UploadsService } from 'src/uploads/uploads.service';
 import { EntityType } from 'src/uploads/enums/entity-type.enum';
-import { Prisma } from '@prisma/client';
+import { Prisma, ReactionType } from '@prisma/client';
 import { getEstatesSelect } from './select/getEstates.select';
 import { UpdateEstateDto } from './dto/update-estate.dto';
 import { GetFilteredEstatesDto } from './dto/get-filtered-estates.dto';
@@ -963,5 +963,71 @@ export class EstatesService {
     if (!user) throw new BadRequestException('Пользователь не найден');
     const count = await this.prisma.estate.count();
     return { count };
+  }
+
+  async toggleReaction(userId: number, estateId: number, requestedType: ReactionType) {
+    const estate = await this.prisma.estate.findUnique({
+      where: { id: estateId },
+      select: { id: true, likes: true, dislikes: true },
+    });
+    if (!estate) throw new NotFoundException('Объявление не найдено');
+    const existingReaction = await this.prisma.reaction.findFirst({
+      where: { userId, estateId },
+    });
+    if (!existingReaction) {
+      const [, updatedEstate] = await this.prisma.$transaction([
+        this.prisma.reaction.create({
+          data: { userId, estateId, type: requestedType },
+        }),
+        this.prisma.estate.update({
+          where: { id: estateId },
+          data: requestedType === ReactionType.LIKE ? { likes: { increment: 1 } } : { dislikes: { increment: 1 } },
+          select: { likes: true, dislikes: true },
+        }),
+      ]);
+      return { action: 'created', likes: updatedEstate.likes, dislikes: updatedEstate.dislikes };
+    }
+    if (existingReaction.type === requestedType) {
+      const [, updatedEstate] = await this.prisma.$transaction([
+        this.prisma.reaction.delete({ where: { id: existingReaction.id } }),
+        this.prisma.estate.update({
+          where: { id: estateId },
+          data: requestedType === ReactionType.LIKE ? { likes: { decrement: 1 } } : { dislikes: { decrement: 1 } },
+          select: { likes: true, dislikes: true },
+        }),
+      ]);
+      return { action: 'deleted', likes: updatedEstate.likes, dislikes: updatedEstate.dislikes };
+    }
+    const oldType = existingReaction.type;
+    const [, updatedEstate] = await this.prisma.$transaction([
+      this.prisma.reaction.update({
+        where: { id: existingReaction.id },
+        data: { type: requestedType },
+      }),
+      this.prisma.estate.update({
+        where: { id: estateId },
+        data: {
+          ...(oldType === ReactionType.LIKE ? { likes: { decrement: 1 } } : { dislikes: { decrement: 1 } }),
+          ...(requestedType === ReactionType.LIKE ? { likes: { increment: 1 } } : { dislikes: { increment: 1 } }),
+        },
+        select: { likes: true, dislikes: true },
+      }),
+    ]);
+    return { action: 'updated', likes: updatedEstate.likes, dislikes: updatedEstate.dislikes };
+  }
+  async getUserReaction(userId: number, estateId: number) {
+    return await this.prisma.reaction.findFirst({ where: { userId, estateId } });
+  }
+
+  async recalcEstateCounters(estateId: number) {
+    const [likesCount, dislikesCount] = await Promise.all([
+      this.prisma.reaction.count({ where: { estateId, type: 'LIKE' } }),
+      this.prisma.reaction.count({ where: { estateId, type: 'DISLIKE' } }),
+    ]);
+    await this.prisma.estate.update({
+      where: { id: estateId },
+      data: { likes: likesCount, dislikes: dislikesCount },
+    });
+    return { likes: likesCount, dislikes: dislikesCount };
   }
 }
