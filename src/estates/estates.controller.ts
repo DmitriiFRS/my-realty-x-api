@@ -199,8 +199,9 @@ export class EstatesController {
   }
 
   @Delete('/admin-delete/:id')
-  async deleteEstateByAdmin(@Param('id') id: number) {
-    return this.estatesService.adminDeleteEstate(5, id);
+  @UseGuards(JwtAuthGuard)
+  async deleteEstateByAdmin(@GetUser('id') userId: number, @Param('id') id: number) {
+    return this.estatesService.adminDeleteEstate(userId, id);
   }
   /* ============================Realtor crm================================= */
 
@@ -296,18 +297,21 @@ export class EstatesController {
   }
 
   @Post('estate/:id/react')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async react(@GetUser('id') userId: number, @Param('id', ParseIntPipe) id: number, @Body() dto: ReactDto) {
     const result = await this.estatesService.toggleReaction(userId, id, dto.type);
     return { message: 'ok', data: result };
   }
   @Get('estate/:id/reaction')
+  @UseGuards(JwtAuthGuard)
   async getUserReaction(@GetUser('id') userId: number, @Param('id', ParseIntPipe) id: number) {
-    const reaction = await this.estatesService.getUserReaction(userId, id);
-    return { data: { type: reaction ? reaction.type : null } };
+    const type = await this.estatesService.getUserReaction(userId, id);
+    return { data: { type } };
   }
 
   @Post('estate/:id/reactions/recalc')
+  @UseGuards(JwtAuthGuard)
   async recalc(@Param('id', ParseIntPipe) id: number) {
     const counts = await this.estatesService.recalcEstateCounters(id);
     return { message: 'recalculated', data: counts };

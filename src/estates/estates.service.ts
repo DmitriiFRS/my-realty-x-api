@@ -1015,8 +1015,16 @@ export class EstatesService {
     ]);
     return { action: 'updated', likes: updatedEstate.likes, dislikes: updatedEstate.dislikes };
   }
-  async getUserReaction(userId: number, estateId: number) {
-    return await this.prisma.reaction.findFirst({ where: { userId, estateId } });
+  async getUserReaction(userId: number, estateId: number): Promise<'like' | 'dislike' | null> {
+    const reaction = await this.prisma.reaction.findFirst({
+      where: { userId, estateId },
+      select: { type: true },
+    });
+
+    if (!reaction) return null;
+
+    const lower = reaction.type.toLowerCase();
+    return lower === 'like' ? 'like' : 'dislike';
   }
 
   async recalcEstateCounters(estateId: number) {
