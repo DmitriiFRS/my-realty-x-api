@@ -83,12 +83,10 @@ export class EstatesService {
       features,
       estateTypeId,
       page = 1,
-      limit = 2,
+      limit = 15,
       sortBy,
       sortOrder,
     } = dto;
-
-    console.log(dto);
 
     const filters: Prisma.EstateWhereInput = {
       status: { status: 'VERIFIED' },
