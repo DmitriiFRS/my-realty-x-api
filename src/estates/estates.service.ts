@@ -83,10 +83,12 @@ export class EstatesService {
       features,
       estateTypeId,
       page = 1,
-      limit = 15,
+      limit: dtoLimit,
       sortBy,
       sortOrder,
     } = dto;
+
+    const limit = dtoLimit === 4 ? 15 : (dtoLimit ?? 15);
 
     const filters: Prisma.EstateWhereInput = {
       status: { status: 'VERIFIED' },
@@ -388,10 +390,18 @@ export class EstatesService {
     dto: CreateLeaseAgreementDto,
     files: { photos?: Express.Multer.File[]; document?: Express.Multer.File[] },
   ) {
+    console.log('DTO received:', dto);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
     if (!user) throw new BadRequestException('Пользователь не найден');
+    const currency = await this.prisma.currencyType.findUnique({
+      where: { id: dto.currencyTypeId },
+    });
+
+    if (!currency) {
+      throw new BadRequestException(`Тип валюты с ID ${dto.currencyTypeId} не найден.`);
+    }
     const existingAgreement = await this.prisma.leaseAgreement.findFirst({
       where: {
         estateId: Number(dto.estateId),

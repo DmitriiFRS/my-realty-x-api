@@ -84,10 +84,8 @@ export class AuthService {
       const slug = `u-${nanoid(10)}`;
       user = await this.prisma.user.create({ data: { phone, name: baseName, slug } });
     }
-    console.log('user after verification:', user);
 
     if (!user) throw new UnauthorizedException('Не удалось найти или создать пользователя.');
-    console.log('User verified and ready to log in:', { id: user.id, phone: user.phone });
     return this.login(user as IUser);
   }
 
@@ -128,7 +126,6 @@ export class AuthService {
   }
 
   async adminLogin(phone: string, password: string) {
-    console.log('Admin login attempt for phone:', phone);
     if (!phone || !password) throw new BadRequestException('phone and password are required');
     const user = await this.usersService.findOne(phone);
     if (!user) throw new UnauthorizedException('Неверные учётные данные');
@@ -252,7 +249,6 @@ export class AuthService {
     const userByTg = await this.prisma.user.findUnique({ where: { telegramId } });
     if (userByTg) {
       if (userByTg.phone !== dto.phone) {
-        console.log('userByTg.phone !== dto.phone', userByTg.phone, dto.phone);
         throw new BadRequestException('Введенный номер телефона не совпадает с номером, который привязан к этому Telegram-аккаунту.');
       }
       return this.login(userByTg as IUser);

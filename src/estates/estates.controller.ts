@@ -247,7 +247,7 @@ export class EstatesController {
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'photos', maxCount: 10 },
-      { name: 'document', maxCount: 1 },
+      { name: 'document', maxCount: 10 },
     ]),
   )
   async create(

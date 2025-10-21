@@ -19,7 +19,7 @@ export class CreateLeaseAgreementDto {
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  currencyTypeId: string;
+  currencyTypeId: number;
 
   @IsDateString()
   endDate: string;

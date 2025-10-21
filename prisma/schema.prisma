@@ -251,6 +251,7 @@ model EstateType {
   id Int @default(autoincrement()) @id
   slug String @unique
   name String
+  icon String?
   canBeBought Boolean @default(true)
   canBeRented Boolean @default(true)
 
