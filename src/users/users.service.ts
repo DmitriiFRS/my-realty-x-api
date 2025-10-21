@@ -6,10 +6,16 @@ import { Prisma, User } from '@prisma/client';
 import { nanoid } from 'nanoid';
 import { UpdateReminderDto } from './dto/updateReminder.dto';
 import { SearchUsersDto } from './dto/search-users.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { EntityType } from 'src/uploads/enums/entity-type.enum';
+import { UploadsService } from 'src/uploads/uploads.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   private async genUniqueSlug(attempts = 5): Promise<string> {
     for (let i = 0; i < attempts; i++) {
@@ -344,5 +350,92 @@ export class UsersService {
     return {
       data: users,
     };
+  }
+  async updateUser(userId: number, targetUserId: number, dto: UpdateUserDto, file: Express.Multer.File) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+    if (!targetUser) throw new NotFoundException('Target user not found');
+    if (user.id !== targetUser.id) {
+      throw new UnauthorizedException('You can update only your own profile');
+    }
+    const { ...restOfDto } = dto;
+    let oldAvatarUrl: string | null = null;
+    let newFileUrl: string | null = null;
+
+    // Запускаем транзакцию для атомарного обновления базы данных
+    const { user: updatedUser, urlToDelete } = await this.prisma.$transaction(async (prisma) => {
+      let newAvatarId: number | undefined = undefined;
+
+      // --- 1. Логика обработки файла (если он есть) ---
+      if (file) {
+        // Если у юзера уже был аватар, находим его и готовим к удалению
+        if (targetUser.avatarMediaId) {
+          const oldAvatar = await prisma.media.findUnique({
+            where: { id: targetUser.avatarMediaId },
+          });
+          if (oldAvatar) {
+            oldAvatarUrl = oldAvatar.url; // Сохраняем URL для удаления файла с диска ПОСЛЕ транзакции
+            await prisma.media.delete({ where: { id: oldAvatar.id } });
+          }
+        }
+
+        // --- 2. Сохраняем новый файл на диск ---
+        try {
+          newFileUrl = await this.uploadsService.saveFile(file);
+        } catch (error) {
+          throw new BadRequestException(`Не удалось сохранить файл: ${error.message}`);
+        }
+
+        // --- 3. Создаем новую запись Media в БД ---
+        const newAvatar = await prisma.media.create({
+          data: {
+            url: newFileUrl,
+            size: file.size,
+            entityId: targetUser.id,
+            entityType: EntityType.AVATAR, // Используем твой Enum
+          },
+        });
+        newAvatarId = newAvatar.id;
+      }
+
+      // --- 4. Обновляем самого пользователя ---
+
+      // Подготавливаем данные для обновления
+      const updateData: Prisma.UserUpdateInput = {
+        ...restOfDto, // Обновляем все поля из DTO (name, и т.д.)
+      };
+
+      // Если был загружен новый аватар, привязываем его
+      if (newAvatarId && newFileUrl) {
+        updateData.avatarMedia = {
+          connect: { id: newAvatarId },
+        };
+        updateData.avatarUrl = newFileUrl;
+        updateData.photo = newFileUrl;
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id: targetUser.id },
+        data: updateData,
+      });
+
+      // Возвращаем обновленного юзера и URL старого файла
+      return { user: updatedUser, urlToDelete: oldAvatarUrl };
+    });
+
+    // --- 5. Очистка (ПОСЛЕ успешной транзакции) ---
+    // Если транзакция прошла успешно и был URL старого файла, удаляем его с диска
+    if (urlToDelete) {
+      await this.uploadsService.deleteFile(urlToDelete); // Используем твой метод
+    }
+
+    // Возвращаем обновленного пользователя контроллеру
+    return updatedUser;
   }
 }

@@ -88,6 +88,8 @@ export class EstatesService {
       sortOrder,
     } = dto;
 
+    console.log(dto);
+
     const filters: Prisma.EstateWhereInput = {
       status: { status: 'VERIFIED' },
       cityId: cityId ? Number(cityId) : undefined,
@@ -489,7 +491,6 @@ export class EstatesService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
-    console.log(user);
     if (!user) throw new BadRequestException('Пользователь не найден');
     return this.updateEstate({ estateUserId: dto.targetUserId, estateId, dto, files });
   }
@@ -562,7 +563,6 @@ export class EstatesService {
     estateUserId?: number;
     isUser?: boolean | undefined;
   }) {
-    console.log(dto);
     const estate = await this.prisma.estate.findUnique({
       where: { id: estateId },
     });

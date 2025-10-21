@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -18,6 +20,9 @@ import { GetUser } from 'src/common/decorators/get-user.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UpdateReminderDto } from './dto/updateReminder.dto';
 import { SearchUsersDto } from './dto/search-users.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { multerConfig } from 'src/uploads/multer.config';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('users')
 export class UsersController {
@@ -76,5 +81,17 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   async getUsersByRole(@GetUser('id') userId: number, @Param('roleSlug') roleSlug: string) {
     return this.usersService.getUsersByRole(userId, roleSlug);
+  }
+
+  @Patch('update/:id')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('photo', multerConfig))
+  async updateUser(
+    @GetUser('id') userId: number,
+    @Param('id', ParseIntPipe) targetUserId: number,
+    @Body() dto: UpdateUserDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.usersService.updateUser(userId, targetUserId, dto, file);
   }
 }

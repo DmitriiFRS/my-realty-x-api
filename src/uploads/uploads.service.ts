@@ -74,7 +74,7 @@ export class UploadsService {
     return `/uploads/${filename}`;
   }
 
-  private async deleteFile(fileUrl: string): Promise<void> {
+  public async deleteFile(fileUrl: string): Promise<void> {
     try {
       const fullPath = path.join(process.cwd(), fileUrl);
       await fs.unlink(fullPath);

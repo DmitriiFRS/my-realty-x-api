@@ -52,25 +52,19 @@ export class AuthService {
   async verifySmsCodeAndLogin(dto: VerifySmsCodeDto) {
     const { phone, code, type, initData } = dto;
 
-    console.log(phone, type);
-
     const verification = await this.prisma.smsVerification.findUnique({
       where: { phone_type: { phone, type } },
     });
-
-    console.log(verification);
 
     if (verification) {
       await this.prisma.smsVerification.delete({ where: { id: verification.id } });
     }
 
     if (!verification || verification.code !== code || new Date() > verification.expiresAt) {
-      console.log('Invalid or expired code');
       throw new BadRequestException('Неверный код или срок его действия истёк.');
     }
 
     if (initData) {
-      console.log('Logging in with Telegram data');
       const userDataFromTelegram = this.validateTelegramInitData(initData);
       const telegramUser = JSON.parse(userDataFromTelegram.user);
       const telegramId = telegramUser.id.toString();
