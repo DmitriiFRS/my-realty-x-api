@@ -21,7 +21,8 @@ export class EstatesService {
   ) {}
 
   async getOffers(page: number = 1, limit: number = 4) {
-    return this.getEstates(page, limit, { status: { status: 'VERIFIED' } }, { select: getEstatesSelect });
+    //нужно установить так же availability: 'SOLD' | "ARCHIVED"
+    return this.getEstates(page, limit, { status: { status: 'VERIFIED' }, availability: 'AVAILABLE' }, { select: getEstatesSelect });
   }
 
   async getPendingEstates() {
@@ -100,6 +101,7 @@ export class EstatesService {
       price: priceFrom || priceTo ? { gte: priceFrom ?? 0, lte: priceTo ?? 1000000000000 } : undefined,
       features: features && features.length > 0 ? { some: { id: { in: features.map((id) => Number(id)) } } } : undefined,
       estateTypeId: estateTypeId ? Number(estateTypeId) : undefined,
+      availability: 'AVAILABLE',
     };
 
     // Определяем orderBy: default = price asc
@@ -257,7 +259,7 @@ export class EstatesService {
     const skip = (page - 1) * limit;
     const take = limit;
     const estates = await this.prisma.estate.findMany({
-      where: { id: { in: ids }, status: { status: 'VERIFIED' } },
+      where: { id: { in: ids }, status: { status: 'VERIFIED' }, availability: 'AVAILABLE' },
       include: {
         city: { select: { id: true, name: true, slug: true } },
         district: { select: { id: true, name: true, slug: true } },
