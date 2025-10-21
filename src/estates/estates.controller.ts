@@ -97,7 +97,7 @@ export class EstatesController {
         { name: 'images', maxCount: 10 },
       ],
       {
-        limits: { fileSize: 5 * 1024 * 1024 },
+        limits: { fileSize: 20 * 1024 * 1024 },
         fileFilter: (req, file, cb) => {
           if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
             return cb(new Error('Только изображения'), false);
@@ -125,7 +125,7 @@ export class EstatesController {
         { name: 'images', maxCount: 10 },
       ],
       {
-        limits: { fileSize: 5 * 1024 * 1024 },
+        limits: { fileSize: 20 * 1024 * 1024 },
         fileFilter: (req, file, cb) => {
           if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
             return cb(new Error('Только изображения'), false);
@@ -153,7 +153,7 @@ export class EstatesController {
         { name: 'images', maxCount: 10 },
       ],
       {
-        limits: { fileSize: 5 * 1024 * 1024 },
+        limits: { fileSize: 20 * 1024 * 1024 },
         fileFilter: (req, file, cb) => {
           if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
             return cb(new Error('Только изображения'), false);
@@ -180,7 +180,7 @@ export class EstatesController {
         { name: 'images', maxCount: 10 },
       ],
       {
-        limits: { fileSize: 5 * 1024 * 1024 },
+        limits: { fileSize: 20 * 1024 * 1024 },
         fileFilter: (req, file, cb) => {
           if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
             return cb(new Error('Только изображения'), false);
@@ -266,7 +266,7 @@ export class EstatesController {
         { name: 'images', maxCount: 10 },
       ],
       {
-        limits: { fileSize: 5 * 1024 * 1024 },
+        limits: { fileSize: 20 * 1024 * 1024 },
         fileFilter: (req, file, cb) => {
           if (!file.mimetype.match(/image\/(jpg|jpeg|png|webp)/)) {
             return cb(new Error('Только изображения'), false);

@@ -37,6 +37,7 @@ export class UsersService {
   }
 
   async getMe(userId: number) {
+    console.log('Getting me for userId:', userId);
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -48,6 +49,7 @@ export class UsersService {
         },
       },
     });
+    console.log('Found user:', user);
     if (!user) throw new BadRequestException('User not found');
     const totalViewsAggregation = await this.prisma.estateView.aggregate({
       _sum: {
@@ -63,7 +65,6 @@ export class UsersService {
       where: { userId: userId },
     });
     const totalViews = totalViewsAggregation._sum.count || 0;
-
     return {
       ...user,
       totalViews: totalViews,
