@@ -40,9 +40,6 @@ export class RemindersService {
     }
   }
   async createReminder(userId: number, dto: CreateReminderDto) {
-    if (![1, 3, 7].includes(dto.advanceDays)) {
-      throw new Error('advanceDays must be one of 1,3,7');
-    }
     const dueDate = new Date(dto.dueDate);
     if (isNaN(dueDate.getTime())) {
       throw new Error('Invalid dueDate');
@@ -56,8 +53,12 @@ export class RemindersService {
     }
 
     const originalDay = dto.originalDay ?? dueDate.getDate();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { nextDue, sendAt } = computeNextOccurrenceSendAt(dueDate, originalDay, dto.advanceDays);
+
+    let sendAt: Date | null = null;
+    if (dto.advanceDays) {
+      const computed = computeNextOccurrenceSendAt(dueDate, originalDay, dto.advanceDays);
+      sendAt = computed.sendAt;
+    }
 
     const reminder = await this.prisma.reminder.create({
       data: {
@@ -67,7 +68,7 @@ export class RemindersService {
         dueDate: dueDate,
         originalDay: originalDay,
         recurrence: dto.recurrence || Recurrence.MONTHLY,
-        advanceDays: dto.advanceDays,
+        advanceDays: dto.advanceDays ?? 999,
         remindAt: sendAt,
         isActive: dto.isActive || true,
         estateId: dto.estateId,

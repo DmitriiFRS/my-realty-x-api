@@ -1,6 +1,6 @@
 import { Recurrence } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateReminderDto {
   @IsInt()
@@ -12,11 +12,10 @@ export class CreateReminderDto {
   @IsString()
   text?: string;
 
-  @IsNotEmpty()
-  @Matches(/^\d+(\.\d{1,2})?$/, {
-    message: 'amount must be a positive number with up to 2 decimals (e.g. 1000.00)',
-  })
-  amount: string;
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  amount: number;
 
   @IsNotEmpty()
   @IsDateString()
@@ -27,10 +26,11 @@ export class CreateReminderDto {
   @Min(1)
   originalDay?: number;
 
+  @IsOptional()
   @IsNotEmpty()
   @IsIn([1, 3, 7])
   @Type(() => Number)
-  advanceDays: number;
+  advanceDays?: number;
 
   @IsOptional()
   @IsEnum(Recurrence)
