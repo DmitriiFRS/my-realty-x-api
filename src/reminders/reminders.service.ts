@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma.service';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -49,6 +48,13 @@ export class RemindersService {
       throw new Error('Invalid dueDate');
     }
 
+    const estate = await this.prisma.estate.findUnique({
+      where: { id: dto.estateId },
+    });
+    if (!estate) {
+      throw new BadRequestException('Estate not found');
+    }
+
     const originalDay = dto.originalDay ?? dueDate.getDate();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { nextDue, sendAt } = computeNextOccurrenceSendAt(dueDate, originalDay, dto.advanceDays);
@@ -64,6 +70,7 @@ export class RemindersService {
         advanceDays: dto.advanceDays,
         remindAt: sendAt,
         isActive: dto.isActive || true,
+        estateId: dto.estateId,
       },
     });
 
@@ -81,6 +88,7 @@ export class RemindersService {
     const reminders = await this.prisma.reminder.findMany({
       where: { userId },
       orderBy: { dueDate: 'asc' },
+      include: { estate: { select: { id: true, slug: true } } },
     });
     return reminders;
   }
