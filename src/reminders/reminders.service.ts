@@ -177,4 +177,77 @@ export class RemindersService {
       }
     }
   }
+
+  async deleteReminder(userId: number, reminderId: number) {
+    const reminder = await this.prisma.reminder.findUnique({
+      where: { id: reminderId },
+    });
+    if (!reminder || reminder.userId !== userId) {
+      throw new BadRequestException('Reminder not found or access denied');
+    }
+
+    const jobName = `reminder-${reminderId}`;
+    if (this.schedulerRegistry.doesExist('cron', jobName)) {
+      const job = this.schedulerRegistry.getCronJob(jobName);
+      await job.stop();
+      this.schedulerRegistry.deleteCronJob(jobName);
+    }
+
+    await this.prisma.reminder.delete({
+      where: { id: reminderId },
+    });
+    return { message: 'Reminder deleted successfully' };
+  }
+
+  async updateReminder(userId: number, reminderId: number, dto: Partial<CreateReminderDto>) {
+    const reminder = await this.prisma.reminder.findUnique({
+      where: { id: reminderId },
+    });
+    if (!reminder || reminder.userId !== userId) {
+      throw new BadRequestException('Reminder not found or access denied');
+    }
+
+    const updateData: any = {};
+
+    if (dto.text !== undefined) updateData.text = dto.text;
+    if (dto.amount !== undefined) updateData.amount = dto.amount;
+    if (dto.dueDate !== undefined) {
+      const dueDate = new Date(dto.dueDate);
+      if (isNaN(dueDate.getTime())) {
+        throw new Error('Invalid dueDate');
+      }
+      updateData.dueDate = dueDate;
+    }
+    if (dto.originalDay !== undefined) updateData.originalDay = dto.originalDay;
+    if (dto.advanceDays !== undefined) updateData.advanceDays = dto.advanceDays;
+    if (dto.recurrence !== undefined) updateData.recurrence = dto.recurrence;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+
+    if (updateData.dueDate || updateData.advanceDays !== undefined || updateData.originalDay !== undefined) {
+      const newDueDate = updateData.dueDate || reminder.dueDate;
+      const newOriginalDay = updateData.originalDay ?? reminder.originalDay ?? new Date(newDueDate).getDate();
+      const newAdvanceDays = updateData.advanceDays ?? reminder.advanceDays;
+
+      if (newAdvanceDays && newAdvanceDays < 999) {
+        const computed = computeNextOccurrenceSendAt(newDueDate, newOriginalDay, newAdvanceDays);
+        updateData.remindAt = computed.sendAt;
+        this.scheduleJob(reminderId, computed.sendAt);
+      } else {
+        updateData.remindAt = null;
+        const jobName = `reminder-${reminderId}`;
+        if (this.schedulerRegistry.doesExist('cron', jobName)) {
+          const job = this.schedulerRegistry.getCronJob(jobName);
+          await job.stop();
+          this.schedulerRegistry.deleteCronJob(jobName);
+        }
+      }
+    }
+
+    const updatedReminder = await this.prisma.reminder.update({
+      where: { id: reminderId },
+      data: updateData,
+    });
+
+    return updatedReminder;
+  }
 }
